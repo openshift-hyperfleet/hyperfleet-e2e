@@ -1,0 +1,22 @@
+{
+  "kind": "NodePool",
+  "name": "hp-gcp-nodepool-1",
+  "labels": {
+    "workload": "gpu",
+    "tier": "compute",
+    "environment": "test"
+  },
+  "spec": {
+    "clusterName": "hp-gcp-cluster-1",
+    "replicas": 2,
+    "platform": {
+      "type": "gcp",
+      "gcp": {
+        "instanceType": "n1-standard-8"
+      }
+    },
+    "release": {
+      "image": "registry.redhat.io/openshift4/ose-cluster-version-operator:v4.14.0"
+    }
+  }
+}
