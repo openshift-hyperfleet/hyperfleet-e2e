@@ -4,6 +4,8 @@
 
 1. [Nodepools Resource Type - Workflow Validation](#test-title-nodepools-resource-type---workflow-validation)
 2. [Nodepools Resource Type - K8s Resource Check Aligned with Preinstalled NodePool Related Adapters Specified](#test-title-nodepools-resource-type---k8s-resource-check-aligned-with-preinstalled-nodepool-related-adapters-specified)
+3. [UPDATE nodepool happy path](#test-title-update-nodepool-happy-path)
+4. [DELETE nodepool happy path](#test-title-delete-nodepool-happy-path)
 
 ---
 
@@ -248,5 +250,158 @@ curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nod
 # Delete cluster
 curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 ```
+
+---
+
+## Test Title: UPDATE nodepool happy path
+
+### Description
+
+This test validates that the nodepool update workflow works end-to-end. After a nodepool reaches `Reconciled=True`, a PATCH request increments the `generation`, adapters re-reconcile, and the nodepool reaches `Reconciled=True` again. This is a smoke test to confirm nodepool update uses the same framework as cluster update.
+
+---
+
+| **Field** | **Value** |
+|-----------|-----------|
+| **Pos/Neg** | Positive |
+| **Priority** | Tier0 |
+| **Status** | Draft |
+| **Automation** | Not Automated |
+| **Version** | Post-MVP |
+| **Created** | 2026-04-08 |
+| **Updated** | 2026-04-08 |
+
+---
+
+### Preconditions
+
+1. Environment is prepared with all required platform resources
+2. HyperFleet API, Sentinel, and adapters are deployed
+3. A cluster exists and has reached `Reconciled=True`
+
+---
+
+### Test Steps
+
+#### Step 1: Create a nodepool and wait for Reconciled=True
+
+**Action:**
+```bash
+curl -X POST ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools \
+  -H "Content-Type: application/json" \
+  -d @testdata/payloads/nodepools/nodepool-request.json
+```
+- Wait for nodepool `Reconciled=True`
+
+**Expected Result:**
+- Nodepool reaches `Reconciled=True`
+- `generation=1`, all adapters `observed_generation=1`
+
+#### Step 2: Update the nodepool via PATCH
+
+**Action:**
+```bash
+curl -X PATCH ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nodepool_id} \
+  -H "Content-Type: application/json" \
+  -d '{"labels": {"updated-by": "e2e-test"}}'
+```
+
+**Expected Result:**
+- PATCH returns successful response
+- `generation` increments to `2`
+
+#### Step 3: Verify nodepool reaches Reconciled=True again
+
+**Action:**
+```bash
+curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nodepool_id}
+curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nodepool_id}/statuses
+```
+
+**Expected Result:**
+- All adapters report `observed_generation=2`
+- Nodepool `Reconciled=True`
+
+#### Step 4: Cleanup (AfterEach)
+
+**Action:**
+- Delete nodepool and cluster via API or clean up K8s resources
+
+---
+
+## Test Title: DELETE nodepool happy path
+
+### Description
+
+This test validates that the nodepool deletion workflow works end-to-end. After a nodepool reaches `Reconciled=True`, a DELETE request marks it for deletion, adapters clean up K8s resources and report `Finalized=True`, and the nodepool is hard-deleted from the database. The parent cluster remains unaffected. This is a smoke test to confirm nodepool deletion uses the same framework as cluster deletion.
+
+---
+
+| **Field** | **Value** |
+|-----------|-----------|
+| **Pos/Neg** | Positive |
+| **Priority** | Tier0 |
+| **Status** | Draft |
+| **Automation** | Not Automated |
+| **Version** | Post-MVP |
+| **Created** | 2026-04-08 |
+| **Updated** | 2026-04-08 |
+
+---
+
+### Preconditions
+
+1. Environment is prepared with all required platform resources
+2. HyperFleet API, Sentinel, and adapters are deployed
+3. A cluster exists and has reached `Reconciled=True`
+
+---
+
+### Test Steps
+
+#### Step 1: Create a nodepool and wait for Reconciled=True
+
+**Action:**
+```bash
+curl -X POST ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools \
+  -H "Content-Type: application/json" \
+  -d @testdata/payloads/nodepools/nodepool-request.json
+```
+- Wait for nodepool `Reconciled=True`
+
+**Expected Result:**
+- Nodepool reaches `Reconciled=True`
+- K8s resources created by nodepool adapters exist (e.g., ConfigMap)
+
+#### Step 2: Delete the nodepool
+
+**Action:**
+```bash
+curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nodepool_id}
+```
+
+**Expected Result:**
+- DELETE returns successful response
+- `deleted_at` is set on the nodepool
+- `generation` incremented
+
+#### Step 3: Verify nodepool is hard-deleted
+
+**Action:**
+- Poll nodepool status until hard-delete:
+```bash
+curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools/{nodepool_id}
+```
+
+**Expected Result:**
+- Nodepool adapters report `Finalized=True`
+- K8s resources created by nodepool adapters are deleted
+- Nodepool is hard-deleted (GET returns 404)
+- Parent cluster remains in `Reconciled=True` (unaffected)
+
+#### Step 4: Cleanup (AfterEach)
+
+**Action:**
+- Delete cluster via API or clean up K8s resources
 
 ---
