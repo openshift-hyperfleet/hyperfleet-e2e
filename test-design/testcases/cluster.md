@@ -902,6 +902,67 @@ curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 
 ---
 
+## Test Title: Adapter unhealthy blocks hard-delete via Finalized=False
+
+### Description
+
+This test validates DDR edge case #11 (Critical). When an adapter is unhealthy during the deletion workflow, it must report `Finalized=False` because it cannot reliably confirm cleanup. This blocks the workflow from completing hard-delete, preventing data loss. Once the adapter recovers, it processes the deletion and the workflow completes normally. This is verified end-to-end: scale down an adapter, delete the cluster, confirm it stays in pending deletion, then restore the adapter and confirm hard-delete completes.
+
+---
+
+| **Field** | **Value** |
+|-----------|-----------|
+| **Pos/Neg** | Negative |
+| **Priority** | Tier0 |
+| **Status** | Draft |
+| **Automation** | Not Automated |
+| **Version** | Post-MVP |
+| **Created** | 2026-04-08 |
+| **Updated** | 2026-04-08 |
+
+---
+
+### Test Steps
+
+#### Step 1: Create cluster and wait for Reconciled=True
+
+#### Step 2: Make an adapter unhealthy, then delete the cluster
+
+**Action:**
+- Scale down one adapter to simulate unhealthy state:
+```bash
+kubectl scale deployment ${ADAPTER_DEPLOYMENT} -n ${NAMESPACE} --replicas=0
+```
+- Delete the cluster:
+```bash
+curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
+```
+
+#### Step 3: Verify cluster is NOT hard-deleted while adapter is unhealthy
+
+**Action:**
+- Poll cluster and adapter statuses over a reasonable period
+
+**Expected Result:**
+- The unhealthy adapter does NOT report `Finalized=True`
+- Cluster `Reconciled` remains `False`
+- Cluster is NOT hard-deleted (GET still returns 200 with `deleted_at` set)
+- Other healthy adapters may report `Finalized=True`, but hard-delete is blocked until ALL adapters confirm
+
+#### Step 4: Restore the adapter and verify deletion workflow completes
+
+**Action:**
+- Scale the adapter back up:
+```bash
+kubectl scale deployment ${ADAPTER_DEPLOYMENT} -n ${NAMESPACE} --replicas=1
+```
+
+**Expected Result:**
+- Adapter recovers, processes the deletion, reports `Finalized=True`
+- Cluster reaches `Reconciled=True` and is hard-deleted (GET returns 404)
+
+---
+
 ## Test Title: Concurrent deletion events handled idempotently
 
 ### Description
@@ -996,67 +1057,6 @@ curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 - Adapters discover resources are already gone (NotFound)
 - Adapters report `Finalized=True` (treat NotFound as successfully deleted)
 - Cluster reaches deletion `Reconciled=True` and is hard-deleted normally (GET returns 404)
-
----
-
-## Test Title: Adapter unhealthy blocks hard-delete via Finalized=False
-
-### Description
-
-This test validates DDR edge case #11 (Critical). When an adapter is unhealthy during the deletion workflow, it must report `Finalized=False` because it cannot reliably confirm cleanup. This blocks the workflow from completing hard-delete, preventing data loss. Once the adapter recovers, it processes the deletion and the workflow completes normally. This is verified end-to-end: scale down an adapter, delete the cluster, confirm it stays in pending deletion, then restore the adapter and confirm hard-delete completes.
-
----
-
-| **Field** | **Value** |
-|-----------|-----------|
-| **Pos/Neg** | Negative |
-| **Priority** | Tier0 |
-| **Status** | Draft |
-| **Automation** | Not Automated |
-| **Version** | Post-MVP |
-| **Created** | 2026-04-08 |
-| **Updated** | 2026-04-08 |
-
----
-
-### Test Steps
-
-#### Step 1: Create cluster and wait for Reconciled=True
-
-#### Step 2: Make an adapter unhealthy, then delete the cluster
-
-**Action:**
-- Scale down one adapter to simulate unhealthy state:
-```bash
-kubectl scale deployment ${ADAPTER_DEPLOYMENT} -n ${NAMESPACE} --replicas=0
-```
-- Delete the cluster:
-```bash
-curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
-```
-
-#### Step 3: Verify cluster is NOT hard-deleted while adapter is unhealthy
-
-**Action:**
-- Poll cluster and adapter statuses over a reasonable period
-
-**Expected Result:**
-- The unhealthy adapter does NOT report `Finalized=True`
-- Cluster `Reconciled` remains `False`
-- Cluster is NOT hard-deleted (GET still returns 200 with `deleted_at` set)
-- Other healthy adapters may report `Finalized=True`, but hard-delete is blocked until ALL adapters confirm
-
-#### Step 4: Restore the adapter and verify deletion workflow completes
-
-**Action:**
-- Scale the adapter back up:
-```bash
-kubectl scale deployment ${ADAPTER_DEPLOYMENT} -n ${NAMESPACE} --replicas=1
-```
-
-**Expected Result:**
-- Adapter recovers, processes the deletion, reports `Finalized=True`
-- Cluster reaches `Reconciled=True` and is hard-deleted (GET returns 404)
 
 ---
 
