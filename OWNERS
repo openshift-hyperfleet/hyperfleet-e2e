@@ -4,17 +4,19 @@ approvers:
 - ciaranRoche
 - crizzo71
 - jsell-rh
+- kuudori
+- ma-hill
 - mbrudnoy
 - Mischulee
 - pnguyen44
 - rafabene
 - rh-amarin
 - tirthct
+- tzhou5
 - vkareh
 - xueli181114
 - yasun1
 - yingzhanredhat
-- tzhou5
 
 reviewers:
 - "86254860"
@@ -22,14 +24,16 @@ reviewers:
 - ciaranRoche
 - crizzo71
 - jsell-rh
+- kuudori
+- ma-hill
 - mbrudnoy
 - Mischulee
 - pnguyen44
 - rafabene
 - rh-amarin
 - tirthct
+- tzhou5
 - vkareh
 - xueli181114
 - yasun1
 - yingzhanredhat
-- tzhou5
