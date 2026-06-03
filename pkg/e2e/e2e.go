@@ -32,12 +32,14 @@ func RunTests(ctx context.Context) int {
 
 	// Configure Ginkgo from viper
 	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
-	configureGinkgoFromViper(&suiteConfig, &reporterConfig)
 
-	// Set default timeout if not configured
-	if suiteConfig.Timeout == 0 {
-		suiteConfig.Timeout = 2 * time.Hour
-	}
+	// Default the suite timeout to 2h. GinkgoConfiguration() returns Ginkgo's
+	// own 1h default (never 0), so a post-hoc `if Timeout == 0` guard never
+	// fired. Set the default here, before the viper override so SUITE_TIMEOUT
+	// still wins when set.
+	suiteConfig.Timeout = 2 * time.Hour
+
+	configureGinkgoFromViper(&suiteConfig, &reporterConfig)
 
 	// Run the test suite using Ginkgo's native GinkgoT
 	// This avoids testing.Main and its os.Exit call
