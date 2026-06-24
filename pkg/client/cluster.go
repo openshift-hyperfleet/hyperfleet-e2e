@@ -60,15 +60,6 @@ func (c *HyperFleetClient) GetClusterStatuses(ctx context.Context, clusterID str
 	return handleHTTPResponse[openapi.AdapterStatusList](resp, http.StatusOK, "get cluster statuses")
 }
 
-// PostClusterStatuses sends a POST to the cluster statuses endpoint.
-// POST was removed in v1.0.0 (replaced by PUT), so this is expected to return 405.
-// Returns the raw HTTP response for status code assertions in negative conformance tests.
-// The caller is responsible for closing the response body.
-func (c *HyperFleetClient) PostClusterStatuses(ctx context.Context, clusterID string, body openapi.AdapterStatusCreateRequest) (*http.Response, error) {
-	path := fmt.Sprintf("clusters/%s/statuses", clusterID)
-	return c.doJSON(ctx, http.MethodPost, path, body)
-}
-
 // CreateClusterFromPayload creates a cluster from a JSON payload file.
 // The payload file should contain a ClusterCreateRequest in JSON format.
 func (c *HyperFleetClient) CreateClusterFromPayload(ctx context.Context, payloadPath string) (*openapi.Cluster, error) {

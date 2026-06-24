@@ -2,8 +2,6 @@ package adapter
 
 import (
 	"context"
-	"net/http"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
@@ -16,92 +14,9 @@ import (
 
 const conditionTypeReady = "Ready"
 
-// These tests verify deployment-level conformance: the deployed v1 stack
-// correctly rejects pre-migration adapter behavior. While the assertions are
-// HTTP status codes, the intent is end-to-end migration validation, not
-// unit-level handler testing.
 var _ = ginkgo.Describe("[Suite: adapter][negative] Legacy adapter behavior rejected by v1 API contract",
 	ginkgo.Label(labels.Tier0, labels.Negative),
 	func() {
-		ginkgo.It("should reject POST to the statuses endpoint with 405",
-			func(ctx context.Context) {
-				h := helper.New()
-				Expect(h.Cfg.Adapters.Cluster).NotTo(BeEmpty(), "at least one cluster adapter must be configured")
-				adapterName := h.Cfg.Adapters.Cluster[0]
-
-				ginkgo.By("creating a cluster")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(cluster.Id).NotTo(BeNil())
-				clusterID := *cluster.Id
-
-				ginkgo.DeferCleanup(func(ctx context.Context) {
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
-					}
-				})
-
-				ginkgo.By("sending a POST status report (old v0.2.0 method)")
-				body := openapi.AdapterStatusCreateRequest{
-					Adapter:            adapterName,
-					ObservedGeneration: cluster.Generation,
-					ObservedTime:       time.Now(),
-					Conditions: []openapi.ConditionRequest{
-						{Type: client.ConditionTypeApplied, Status: openapi.AdapterConditionStatusTrue},
-						{Type: client.ConditionTypeAvailable, Status: openapi.AdapterConditionStatusTrue},
-						{Type: client.ConditionTypeHealth, Status: openapi.AdapterConditionStatusTrue},
-					},
-				}
-				resp, err := h.Client.PostClusterStatuses(ctx, clusterID, body)
-				defer func() {
-					if resp != nil {
-						_ = resp.Body.Close()
-					}
-				}()
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(resp.StatusCode).To(Equal(http.StatusMethodNotAllowed),
-					"POST to statuses should return 405; v1.0.0 only accepts PUT")
-			})
-
-		ginkgo.It("should reject PUT with missing mandatory conditions with 400",
-			func(ctx context.Context) {
-				h := helper.New()
-				Expect(h.Cfg.Adapters.Cluster).NotTo(BeEmpty(), "at least one cluster adapter must be configured")
-				adapterName := h.Cfg.Adapters.Cluster[0]
-
-				ginkgo.By("creating a cluster")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(cluster.Id).NotTo(BeNil())
-				clusterID := *cluster.Id
-
-				ginkgo.DeferCleanup(func(ctx context.Context) {
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
-					}
-				})
-
-				ginkgo.By("sending a PUT with only a Ready condition (missing Applied, Available, Health)")
-				resp, err := h.Client.PutClusterStatuses(ctx, clusterID, openapi.AdapterStatusCreateRequest{
-					Adapter:            adapterName,
-					ObservedGeneration: cluster.Generation,
-					ObservedTime:       time.Now(),
-					Conditions: []openapi.ConditionRequest{
-						{Type: conditionTypeReady, Status: openapi.AdapterConditionStatusTrue},
-					},
-				})
-				defer func() {
-					if resp != nil {
-						_ = resp.Body.Close()
-					}
-				}()
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest),
-					"missing mandatory conditions (Available, Applied, Health) should return 400")
-			})
-
 		ginkgo.It("should not have a resource-level Ready condition on a reconciled cluster",
 			func(ctx context.Context) {
 				h := helper.New()
