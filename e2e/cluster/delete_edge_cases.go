@@ -29,7 +29,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Re-DELETE Idempotency and API 
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should handle re-DELETE idempotently without changing deleted_time or generation",
@@ -93,13 +93,13 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] DELETE During Update Reconcili
 			clusterID = *cluster.Id
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should complete deletion when DELETE is sent during update reconciliation", func(ctx context.Context) {
 			ginkgo.By("sending PATCH to trigger generation 2 (do NOT wait for reconciliation)")
 			patchedCluster, err := h.Client.PatchCluster(ctx, clusterID, openapi.ClusterPatchRequest{
-				Spec: &openapi.ClusterSpec{"trigger-update": "true"},
+				Labels: &map[string]string{"trigger-update": "true"},
 			})
 			Expect(err).NotTo(HaveOccurred(), "PATCH should succeed")
 			Expect(patchedCluster.Generation).To(Equal(int32(2)))
@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 			originalCluster = cluster
 
 			Eventually(h.PollCluster(ctx, firstClusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should create a new cluster with the same name after the original is hard-deleted", func(ctx context.Context) {
@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 
 			ginkgo.By("waiting for the new cluster to reach Reconciled")
 			Eventually(h.PollCluster(ctx, secondClusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			ginkgo.By("verifying the old cluster is still gone")
 			_, err = h.Client.GetCluster(ctx, firstClusterID)

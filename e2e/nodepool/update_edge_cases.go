@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			ginkgo.By("creating nodepool and waiting for Reconciled at generation 1")
 			np, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 			nodepoolID = *np.Id
 
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should bump generation and trigger reconciliation from a labels-only PATCH", func(ctx context.Context) {
@@ -70,9 +70,9 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 
 			ginkgo.By("verifying nodepool reaches Reconciled=True and LastKnownReconciled=True")
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeLastKnownReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeLastKnownReconciled, openapi.True))
 
 			finalNP, err := h.Client.GetNodePool(ctx, clusterID, nodepoolID)
 			Expect(err).NotTo(HaveOccurred())
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 			Expect(parentCluster.Generation).To(Equal(parentBefore.Generation),
 				"nodepool labels PATCH should not affect cluster generation")
 
-			hasParentReconciled := h.HasResourceCondition(parentCluster.Status.Conditions, client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)
+			hasParentReconciled := h.HasResourceCondition(parentCluster.Status.Conditions, client.ConditionTypeReconciled, openapi.True)
 			Expect(hasParentReconciled).To(BeTrue(), "parent cluster should remain Reconciled=True")
 		})
 

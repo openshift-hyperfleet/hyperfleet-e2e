@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/logger"
 )
@@ -47,12 +48,12 @@ func (c *HyperFleetClient) ListNodePools(ctx context.Context, clusterID string) 
 }
 
 // GetNodePoolStatuses retrieves all adapter statuses for a nodepool.
-func (c *HyperFleetClient) GetNodePoolStatuses(ctx context.Context, clusterID, nodepoolID string) (*openapi.AdapterStatusList, error) {
-	resp, err := c.GetNodePoolsStatuses(ctx, clusterID, nodepoolID, &openapi.GetNodePoolsStatusesParams{})
+func (c *HyperFleetClient) GetNodePoolStatuses(ctx context.Context, clusterID, nodepoolID string) (*core.AdapterStatusList, error) {
+	resp, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("clusters/%s/nodepools/%s/statuses", clusterID, nodepoolID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nodepool statuses: %w", err)
 	}
-	return handleHTTPResponse[openapi.AdapterStatusList](resp, http.StatusOK, "get nodepool statuses")
+	return handleHTTPResponse[core.AdapterStatusList](resp, http.StatusOK, "get nodepool statuses")
 }
 
 // CreateNodePoolFromPayload creates a nodepool from a JSON payload file.
@@ -121,7 +122,7 @@ func (c *HyperFleetClient) PatchNodePoolFromPayload(ctx context.Context, cluster
 func (c *HyperFleetClient) ForceDeleteNodePool(ctx context.Context, clusterID, nodepoolID, reason string) error {
 	logger.Info("force-deleting nodepool", "cluster_id", clusterID, "nodepool_id", nodepoolID, "reason", reason)
 
-	resp, err := c.Client.ForceDeleteNodePool(ctx, clusterID, nodepoolID, openapi.ForceDeleteRequest{Reason: reason})
+	resp, err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("clusters/%s/nodepools/%s/force-delete", clusterID, nodepoolID), core.ForceDeleteRequest{Reason: reason})
 	if err != nil {
 		return fmt.Errorf("failed to force-delete nodepool: %w", err)
 	}

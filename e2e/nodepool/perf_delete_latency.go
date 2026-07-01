@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Delete-to-hard-delete latency",
 
 			ginkgo.By("waiting for nodepool to reach Reconciled before delete")
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should delete a nodepool and reach hard-delete within acceptable latency", func(ctx context.Context) {

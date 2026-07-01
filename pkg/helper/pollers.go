@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 )
@@ -24,15 +25,15 @@ func (h *Helper) PollNodePool(ctx context.Context, clusterID, npID string) func(
 }
 
 // PollClusterAdapterStatuses returns a polling function for cluster adapter status checks.
-func (h *Helper) PollClusterAdapterStatuses(ctx context.Context, clusterID string) func() (*openapi.AdapterStatusList, error) {
-	return func() (*openapi.AdapterStatusList, error) {
+func (h *Helper) PollClusterAdapterStatuses(ctx context.Context, clusterID string) func() (*core.AdapterStatusList, error) {
+	return func() (*core.AdapterStatusList, error) {
 		return h.Client.GetClusterStatuses(ctx, clusterID)
 	}
 }
 
 // PollNodePoolAdapterStatuses returns a polling function for nodepool adapter status checks.
-func (h *Helper) PollNodePoolAdapterStatuses(ctx context.Context, clusterID, npID string) func() (*openapi.AdapterStatusList, error) {
-	return func() (*openapi.AdapterStatusList, error) {
+func (h *Helper) PollNodePoolAdapterStatuses(ctx context.Context, clusterID, npID string) func() (*core.AdapterStatusList, error) {
+	return func() (*core.AdapterStatusList, error) {
 		return h.Client.GetNodePoolStatuses(ctx, clusterID, npID)
 	}
 }

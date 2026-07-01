@@ -7,6 +7,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -119,7 +120,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 					g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
 					// Find the precondition-error-adapter in statuses
-					var adapterStatus *openapi.AdapterStatus
+					var adapterStatus *core.AdapterStatus
 					for i, status := range statuses.Items {
 						if status.Adapter == adapterName {
 							adapterStatus = &statuses.Items[i]
@@ -131,17 +132,17 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 
 					// Verify Applied=False
 					g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-						client.ConditionTypeApplied, openapi.AdapterConditionStatusFalse)).To(BeTrue(),
+						client.ConditionTypeApplied, core.AdapterConditionStatusFalse)).To(BeTrue(),
 						"precondition-error-adapter should have Applied=False")
 
 					// Verify Available=False
 					g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-						client.ConditionTypeAvailable, openapi.AdapterConditionStatusFalse)).To(BeTrue(),
+						client.ConditionTypeAvailable, core.AdapterConditionStatusFalse)).To(BeTrue(),
 						"precondition-error-adapter should have Available=False")
 
 					// Verify Health=False with reason/message indicating precondition failure
 					g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-						client.ConditionTypeHealth, openapi.AdapterConditionStatusFalse)).To(BeTrue(),
+						client.ConditionTypeHealth, core.AdapterConditionStatusFalse)).To(BeTrue(),
 						"precondition-error-adapter should have Health=False")
 
 					healthCond := h.GetCondition(adapterStatus.Conditions, client.ConditionTypeHealth)
@@ -167,11 +168,11 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 					g.Expect(cl.Status).NotTo(BeNil(), "cluster status should be present")
 
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
-						client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)).To(BeTrue(),
+						client.ConditionTypeReconciled, openapi.True)).To(BeTrue(),
 						"cluster Reconciled should become True despite non-required adapter failure")
 
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
-						client.ConditionTypeLastKnownReconciled, openapi.ResourceConditionStatusTrue)).To(BeTrue(),
+						client.ConditionTypeLastKnownReconciled, openapi.True)).To(BeTrue(),
 						"cluster LastKnownReconciled should become True despite non-required adapter failure")
 				}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 

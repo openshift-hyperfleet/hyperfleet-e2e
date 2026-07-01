@@ -6,6 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -53,7 +54,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 						g.Expect(statuses.Items).NotTo(BeEmpty(), "at least one adapter should have executed")
 
 						// Build a map of adapter statuses for easy lookup
-						adapterMap := make(map[string]openapi.AdapterStatus)
+						adapterMap := make(map[string]core.AdapterStatus)
 						for _, adapter := range statuses.Items {
 							adapterMap[adapter.Adapter] = adapter
 						}
@@ -75,7 +76,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 							hasApplied := h.HasAdapterCondition(
 								adapter.Conditions,
 								client.ConditionTypeApplied,
-								openapi.AdapterConditionStatusTrue,
+								core.AdapterConditionStatusTrue,
 							)
 							g.Expect(hasApplied).To(BeTrue(),
 								"adapter %s should have Applied=True", adapter.Adapter)
@@ -83,7 +84,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 							hasAvailable := h.HasAdapterCondition(
 								adapter.Conditions,
 								client.ConditionTypeAvailable,
-								openapi.AdapterConditionStatusTrue,
+								core.AdapterConditionStatusTrue,
 							)
 							g.Expect(hasAvailable).To(BeTrue(),
 								"adapter %s should have Available=True", adapter.Adapter)
@@ -91,7 +92,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 							hasHealth := h.HasAdapterCondition(
 								adapter.Conditions,
 								client.ConditionTypeHealth,
-								openapi.AdapterConditionStatusTrue,
+								core.AdapterConditionStatusTrue,
 							)
 							g.Expect(hasHealth).To(BeTrue(),
 								"adapter %s should have Health=True", adapter.Adapter)
@@ -118,18 +119,18 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					// Wait for cluster Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the cluster has reached the desired end state
 					Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 					finalCluster, err := h.Client.GetCluster(ctx, clusterID)
 					Expect(err).NotTo(HaveOccurred(), "failed to get final cluster state")
 					Expect(finalCluster.Status).NotTo(BeNil(), "cluster status should be present")
 
 					hasReconciled := h.HasResourceCondition(finalCluster.Status.Conditions,
-						client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)
+						client.ConditionTypeReconciled, openapi.True)
 					Expect(hasReconciled).To(BeTrue(), "cluster should have Reconciled=True condition")
 
 					hasAvailable := h.HasResourceCondition(finalCluster.Status.Conditions,
-						client.ConditionTypeLastKnownReconciled, openapi.ResourceConditionStatusTrue)
+						client.ConditionTypeLastKnownReconciled, openapi.True)
 					Expect(hasAvailable).To(BeTrue(), "cluster should have LastKnownReconciled=True condition")
 
 					// Validate observedGeneration for Reconciled and LastKnownReconciled conditions
@@ -147,7 +148,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 						hasAdapterCondition := h.HasResourceCondition(
 							finalCluster.Status.Conditions,
 							expectedCondType,
-							openapi.ResourceConditionStatusTrue,
+							openapi.True,
 						)
 						Expect(hasAdapterCondition).To(BeTrue(),
 							"cluster should have %s=True condition for adapter %s",
@@ -220,7 +221,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					// Wait for cluster Reconciled condition to prevent namespace deletion conflicts
 					// Without this, adapters may still be creating resources during cleanup
 					Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 				})
 		})
 
@@ -235,7 +236,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 						statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
 						g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
-						adapterMap := make(map[string]openapi.AdapterStatus)
+						adapterMap := make(map[string]core.AdapterStatus)
 						for _, adapter := range statuses.Items {
 							adapterMap[adapter.Adapter] = adapter
 						}
@@ -248,15 +249,15 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 								"adapter %s should have observed_generation=1 for new creation request", name)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeApplied, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeApplied, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"adapter %s should have Applied=True", name)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeAvailable, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeAvailable, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"adapter %s should have Available=True", name)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeHealth, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeHealth, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"adapter %s should have Health=True", name)
 
 							for _, condition := range adapter.Conditions {

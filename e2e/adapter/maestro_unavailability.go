@@ -6,6 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // Gomega matchers are designed to be used with dot import
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client/maestro"
@@ -80,7 +81,7 @@ func verifyMaestroAdapterFailure(ctx context.Context, h *helper.Helper, clusterI
 		statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
 		g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
-		var adapterStatus *openapi.AdapterStatus
+		var adapterStatus *core.AdapterStatus
 		for i, status := range statuses.Items {
 			if status.Adapter == adapterName {
 				adapterStatus = &statuses.Items[i]
@@ -91,15 +92,15 @@ func verifyMaestroAdapterFailure(ctx context.Context, h *helper.Helper, clusterI
 			"Maestro adapter should be present in statuses")
 
 		g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-			client.ConditionTypeApplied, openapi.AdapterConditionStatusFalse)).To(BeTrue(),
+			client.ConditionTypeApplied, core.AdapterConditionStatusFalse)).To(BeTrue(),
 			"Maestro adapter Applied should be False")
 
 		g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-			client.ConditionTypeAvailable, openapi.AdapterConditionStatusFalse)).To(BeTrue(),
+			client.ConditionTypeAvailable, core.AdapterConditionStatusFalse)).To(BeTrue(),
 			"Maestro adapter Available should be False")
 
 		g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-			client.ConditionTypeHealth, openapi.AdapterConditionStatusFalse)).To(BeTrue(),
+			client.ConditionTypeHealth, core.AdapterConditionStatusFalse)).To(BeTrue(),
 			"Maestro adapter Health should be False")
 	}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 }
@@ -112,7 +113,7 @@ func verifyClusterNotReconciledDuringOutage(ctx context.Context, h *helper.Helpe
 		g.Expect(cl.Status).NotTo(BeNil(), "cluster status should be present")
 
 		g.Expect(h.HasResourceCondition(cl.Status.Conditions,
-			client.ConditionTypeReconciled, openapi.ResourceConditionStatusFalse)).To(BeTrue(),
+			client.ConditionTypeReconciled, openapi.False)).To(BeTrue(),
 			"cluster Reconciled should remain False while Maestro is unavailable")
 	}, h.Cfg.Polling.Interval*3, h.Cfg.Polling.Interval).Should(Succeed())
 }
@@ -123,7 +124,7 @@ func verifyMaestroAdapterRecovery(ctx context.Context, h *helper.Helper, cluster
 		statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
 		g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
-		var adapterStatus *openapi.AdapterStatus
+		var adapterStatus *core.AdapterStatus
 		for i, status := range statuses.Items {
 			if status.Adapter == adapterName {
 				adapterStatus = &statuses.Items[i]
@@ -134,15 +135,15 @@ func verifyMaestroAdapterRecovery(ctx context.Context, h *helper.Helper, cluster
 			"Maestro adapter should be present in statuses after recovery")
 
 		g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-			client.ConditionTypeApplied, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+			client.ConditionTypeApplied, core.AdapterConditionStatusTrue)).To(BeTrue(),
 			"Maestro adapter Applied should be True after recovery")
 
 		g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-			client.ConditionTypeAvailable, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+			client.ConditionTypeAvailable, core.AdapterConditionStatusTrue)).To(BeTrue(),
 			"Maestro adapter Available should be True after recovery")
 
 		g.Expect(h.HasAdapterCondition(adapterStatus.Conditions,
-			client.ConditionTypeHealth, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+			client.ConditionTypeHealth, core.AdapterConditionStatusTrue)).To(BeTrue(),
 			"Maestro adapter Health should be True after recovery")
 	}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 }
@@ -155,11 +156,11 @@ func verifyClusterReconciledAfterRecovery(ctx context.Context, h *helper.Helper,
 		g.Expect(cl.Status).NotTo(BeNil(), "cluster status should be present")
 
 		g.Expect(h.HasResourceCondition(cl.Status.Conditions,
-			client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)).To(BeTrue(),
+			client.ConditionTypeReconciled, openapi.True)).To(BeTrue(),
 			"cluster Reconciled should transition to True")
 
 		g.Expect(h.HasResourceCondition(cl.Status.Conditions,
-			client.ConditionTypeLastKnownReconciled, openapi.ResourceConditionStatusTrue)).To(BeTrue(),
+			client.ConditionTypeLastKnownReconciled, openapi.True)).To(BeTrue(),
 			"cluster LastKnownReconciled should transition to True")
 	}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 }

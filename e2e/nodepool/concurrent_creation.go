@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -106,13 +107,13 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 				for i, npID := range nodepoolIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for nodepool %d (%s) to become Reconciled...\n", i, npID)
 					Eventually(h.PollNodePool(ctx, clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 					np, err := h.Client.GetNodePool(ctx, clusterID, npID)
 					Expect(err).NotTo(HaveOccurred(), "failed to get nodepool %d (%s)", i, npID)
 
 					hasAvailable := h.HasResourceCondition(np.Status.Conditions,
-						client.ConditionTypeLastKnownReconciled, openapi.ResourceConditionStatusTrue)
+						client.ConditionTypeLastKnownReconciled, openapi.True)
 					Expect(hasAvailable).To(BeTrue(),
 						"nodepool %d (%s) should have LastKnownReconciled=True", i, npID)
 
@@ -139,7 +140,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 						g.Expect(err).NotTo(HaveOccurred(), "failed to get nodepool statuses for nodepool %d (%s)", i, npID)
 						g.Expect(statuses.Items).NotTo(BeEmpty(), "nodepool %d (%s) should have adapter statuses", i, npID)
 
-						adapterMap := make(map[string]openapi.AdapterStatus)
+						adapterMap := make(map[string]core.AdapterStatus)
 						for _, adapter := range statuses.Items {
 							adapterMap[adapter.Adapter] = adapter
 						}
@@ -150,15 +151,15 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 								"nodepool %d (%s): required adapter %s should be present", i, npID, requiredAdapter)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeApplied, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeApplied, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"nodepool %d (%s): adapter %s should have Applied=True", i, npID, requiredAdapter)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeAvailable, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeAvailable, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"nodepool %d (%s): adapter %s should have Available=True", i, npID, requiredAdapter)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeHealth, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeHealth, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"nodepool %d (%s): adapter %s should have Health=True", i, npID, requiredAdapter)
 						}
 					}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())

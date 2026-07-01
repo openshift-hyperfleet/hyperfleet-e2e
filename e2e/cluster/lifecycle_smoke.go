@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Full Lifecycle Smoke
 
 				ginkgo.By("waiting for Reconciled=True")
 				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 				ginkgo.By("confirming reconciled state via GET")
 				reconciledCluster, err := h.Client.GetCluster(ctx, clusterID)
@@ -43,7 +43,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Full Lifecycle Smoke
 				Expect(reconciledCluster).NotTo(BeNil(), "GET should return cluster object")
 				Expect(reconciledCluster.Status).NotTo(BeNil())
 				Expect(h.HasResourceCondition(reconciledCluster.Status.Conditions,
-					client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)).To(BeTrue())
+					client.ConditionTypeReconciled, openapi.True)).To(BeTrue())
 
 				ginkgo.By("soft-deleting the cluster")
 				deletedCluster, err := h.Client.DeleteCluster(ctx, clusterID)

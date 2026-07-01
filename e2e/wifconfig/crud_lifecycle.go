@@ -6,7 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -16,7 +16,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 	func() {
 		var h *helper.Helper
 		var wifConfigID string
-		var wifConfig *client.Resource
+		var wifConfig *openapi.WifConfig
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
@@ -75,10 +75,10 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 			updatedVersion := "4.18"
 
 			ginkgo.By("patching wifconfig spec")
-			patched, err := h.Client.PatchWifConfig(ctx, wifConfigID, client.ResourcePatchRequest{
-				Spec: map[string]any{
-					"projectId": updatedProjectID,
-					"version":   updatedVersion,
+			patched, err := h.Client.PatchWifConfig(ctx, wifConfigID, openapi.WifConfigPatchRequest{
+				Spec: &openapi.WifConfigSpec{
+					ProjectId: updatedProjectID,
+					Version:   updatedVersion,
 				},
 			})
 			Expect(err).NotTo(HaveOccurred(), "failed to patch wifconfig")
@@ -87,8 +87,8 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 			ginkgo.By("verifying patched spec via GET")
 			fetched, err := h.Client.GetWifConfig(ctx, wifConfigID)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fetched.Spec["projectId"]).To(Equal(updatedProjectID))
-			Expect(fetched.Spec["version"]).To(Equal(updatedVersion))
+			Expect(fetched.Spec.ProjectId).To(Equal(updatedProjectID))
+			Expect(fetched.Spec.Version).To(Equal(updatedVersion))
 		})
 
 		ginkgo.It("should delete wifconfig", func(ctx context.Context) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/logger"
 )
@@ -52,12 +53,12 @@ func (c *HyperFleetClient) ListClustersWithParams(ctx context.Context, params *o
 }
 
 // GetClusterStatuses retrieves all adapter statuses for a cluster.
-func (c *HyperFleetClient) GetClusterStatuses(ctx context.Context, clusterID string) (*openapi.AdapterStatusList, error) {
-	resp, err := c.Client.GetClusterStatuses(ctx, clusterID, &openapi.GetClusterStatusesParams{})
+func (c *HyperFleetClient) GetClusterStatuses(ctx context.Context, clusterID string) (*core.AdapterStatusList, error) {
+	resp, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("clusters/%s/statuses", clusterID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster statuses: %w", err)
 	}
-	return handleHTTPResponse[openapi.AdapterStatusList](resp, http.StatusOK, "get cluster statuses")
+	return handleHTTPResponse[core.AdapterStatusList](resp, http.StatusOK, "get cluster statuses")
 }
 
 // CreateClusterFromPayload creates a cluster from a JSON payload file.
@@ -126,7 +127,7 @@ func (c *HyperFleetClient) PatchClusterFromPayload(ctx context.Context, clusterI
 func (c *HyperFleetClient) ForceDeleteCluster(ctx context.Context, clusterID, reason string) error {
 	logger.Info("force-deleting cluster", "cluster_id", clusterID, "reason", reason)
 
-	resp, err := c.Client.ForceDeleteCluster(ctx, clusterID, openapi.ForceDeleteRequest{Reason: reason})
+	resp, err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("clusters/%s/force-delete", clusterID), core.ForceDeleteRequest{Reason: reason})
 	if err != nil {
 		return fmt.Errorf("failed to force-delete cluster: %w", err)
 	}

@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Update-to-re-reconciled latency"
 
 			ginkgo.By("waiting for cluster to reach Reconciled before update")
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should update a cluster and reach Reconciled within acceptable latency", func(ctx context.Context) {
@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Update-to-re-reconciled latency"
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(cluster.Generation).To(BeNumerically(">=", expectedGen))
 				g.Expect(h.HasResourceCondition(cluster.Status.Conditions,
-					client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)).
+					client.ConditionTypeReconciled, openapi.True)).
 					To(BeTrue(), "expected Reconciled=True at generation %d", expectedGen)
 			}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 

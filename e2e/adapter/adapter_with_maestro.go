@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega" //nolint:staticcheck // Gomega matchers are designed to be used with dot import
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client/maestro"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 					// Verify Go template conditional label: platformType captured from cluster spec ({{ if .platformType }})
 					Expect(resourceBundle.Metadata.Labels).To(HaveKey("hyperfleet.io/platform-type"),
 						"ManifestWork should have platform-type label from {{ if .platformType }} Go template")
-					Expect(resourceBundle.Metadata.Labels["hyperfleet.io/platform-type"]).To(Equal("gcp"),
+					Expect(resourceBundle.Metadata.Labels["hyperfleet.io/platform-type"]).To(Equal("template"),
 						"platform-type label should match cluster spec.platform.type")
 
 					// Verify annotations
@@ -195,13 +195,13 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						g.Expect(cm.Data["cluster_name"]).To(Equal(clusterName))
 
 						// Verify Go template {{ if }}/{{ else }} conditional:
-						// platformType is captured from spec.platform.type via CEL; cluster payload has type="gcp"
-						// so {{ if eq .platformType "gcp" }} renders platform_tier="cloud", else "onprem"
+						// platformType is captured from spec.platform.type via CEL; cluster payload has type="template"
+						// so {{ if eq .platformType "template" }} renders platform_tier="cloud", else "onprem"
 						g.Expect(cm.Data).To(HaveKeyWithValue("platform_tier", "cloud"),
-							"ConfigMap should have platform_tier=cloud from {{ if eq .platformType \"gcp\" }} Go template")
+							"ConfigMap should have platform_tier=cloud from {{ if eq .platformType \"template\" }} Go template")
 
 						// Verify Go template {{ range }} over dynamic subnet list captured from cluster spec
-						// Each subnet in spec.platform.gcp.subnets produces 3 keys: subnet_{id}_name, subnet_{id}_cidr, subnet_{id}_role
+						// Each subnet in spec.platform.template.subnets produces 3 keys: subnet_{id}_name, subnet_{id}_cidr, subnet_{id}_role
 						expectedSubnets := []struct {
 							id, name, cidr, role string
 						}{
@@ -231,7 +231,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
 						// Find the adapter status
-						var adapterStatus *openapi.AdapterStatus
+						var adapterStatus *core.AdapterStatus
 						for _, status := range statuses.Items {
 							if status.Adapter == adapterName {
 								adapterStatus = &status
@@ -253,7 +253,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						hasApplied := h.HasAdapterCondition(
 							adapterStatus.Conditions,
 							client.ConditionTypeApplied,
-							openapi.AdapterConditionStatusTrue,
+							core.AdapterConditionStatusTrue,
 						)
 						g.Expect(hasApplied).To(BeTrue(),
 							"adapter should have Applied=True")
@@ -267,7 +267,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						hasAvailable := h.HasAdapterCondition(
 							adapterStatus.Conditions,
 							client.ConditionTypeAvailable,
-							openapi.AdapterConditionStatusTrue,
+							core.AdapterConditionStatusTrue,
 						)
 						g.Expect(hasAvailable).To(BeTrue(),
 							"adapter should have Available=True")
@@ -281,7 +281,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						hasHealth := h.HasAdapterCondition(
 							adapterStatus.Conditions,
 							client.ConditionTypeHealth,
-							openapi.AdapterConditionStatusTrue,
+							core.AdapterConditionStatusTrue,
 						)
 						g.Expect(hasHealth).To(BeTrue(),
 							"adapter should have Health=True")
@@ -365,7 +365,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
 						g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
-						var adapterStatus *openapi.AdapterStatus
+						var adapterStatus *core.AdapterStatus
 						for _, status := range statuses.Items {
 							if status.Adapter == adapterName {
 								adapterStatus = &status
@@ -385,7 +385,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 						statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
 						g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
-						var adapterStatus *openapi.AdapterStatus
+						var adapterStatus *core.AdapterStatus
 						for _, status := range statuses.Items {
 							if status.Adapter == adapterName {
 								adapterStatus = &status
@@ -532,7 +532,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 					g.Expect(statuses.Items).NotTo(BeEmpty(), "adapter should have reported status")
 
 					// Find the test adapter status
-					var adapterStatus *openapi.AdapterStatus
+					var adapterStatus *core.AdapterStatus
 					for i, adapter := range statuses.Items {
 						if adapter.Adapter == adapterName {
 							adapterStatus = &statuses.Items[i]
@@ -548,7 +548,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 						"adapter should have observed_generation=1")
 
 					// Find Health condition
-					var healthCondition *openapi.AdapterCondition
+					var healthCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeHealth {
 							healthCondition = &adapterStatus.Conditions[i]
@@ -560,7 +560,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 						"adapter should have Health condition")
 
 					// Verify Health condition reports failure
-					g.Expect(healthCondition.Status).To(Equal(openapi.AdapterConditionStatusFalse),
+					g.Expect(healthCondition.Status).To(Equal(core.AdapterConditionStatusFalse),
 						"adapter Health condition should be False due to unregistered consumer")
 
 					// Verify error details mention consumer not found/registered
@@ -574,7 +574,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 					), "error message should mention unregistered consumer")
 
 					// Find Applied condition - should be False
-					var appliedCondition *openapi.AdapterCondition
+					var appliedCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeApplied {
 							appliedCondition = &adapterStatus.Conditions[i]
@@ -584,7 +584,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(appliedCondition).NotTo(BeNil(),
 						"adapter should have Applied condition")
-					g.Expect(appliedCondition.Status).To(Equal(openapi.AdapterConditionStatusFalse),
+					g.Expect(appliedCondition.Status).To(Equal(core.AdapterConditionStatusFalse),
 						"adapter Applied condition should be False since ManifestWork was not created")
 
 					ginkgo.GinkgoWriter.Printf("Verified adapter failure for unregistered consumer: Health=%s, Applied=%s\n",
@@ -713,7 +713,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 					g.Expect(statuses.Items).NotTo(BeEmpty(), "adapter should have reported status")
 
 					// Find the test adapter status
-					var adapterStatus *openapi.AdapterStatus
+					var adapterStatus *core.AdapterStatus
 					for i, adapter := range statuses.Items {
 						if adapter.Adapter == adapterName {
 							adapterStatus = &statuses.Items[i]
@@ -729,7 +729,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 						"adapter should have observed_generation=1")
 
 					// Find Applied condition - should be False (ManifestWork not discovered)
-					var appliedCondition *openapi.AdapterCondition
+					var appliedCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeApplied {
 							appliedCondition = &adapterStatus.Conditions[i]
@@ -739,14 +739,14 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(appliedCondition).NotTo(BeNil(),
 						"adapter should have Applied condition")
-					g.Expect(appliedCondition.Status).To(Equal(openapi.AdapterConditionStatusFalse),
+					g.Expect(appliedCondition.Status).To(Equal(core.AdapterConditionStatusFalse),
 						"Applied should be False - ManifestWork not discovered")
 					g.Expect(appliedCondition.Reason).NotTo(BeNil())
 					g.Expect(*appliedCondition.Reason).To(Equal("ManifestWorkNotDiscovered"),
 						"Applied reason should be ManifestWorkNotDiscovered")
 
 					// Find Available condition - should be False
-					var availableCondition *openapi.AdapterCondition
+					var availableCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeAvailable {
 							availableCondition = &adapterStatus.Conditions[i]
@@ -756,14 +756,14 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(availableCondition).NotTo(BeNil(),
 						"adapter should have Available condition")
-					g.Expect(availableCondition.Status).To(Equal(openapi.AdapterConditionStatusFalse),
+					g.Expect(availableCondition.Status).To(Equal(core.AdapterConditionStatusFalse),
 						"Available should be False")
 					g.Expect(availableCondition.Reason).NotTo(BeNil())
 					g.Expect(*availableCondition.Reason).To(Equal("NamespaceNotDiscovered"),
 						"Available reason should be NamespaceNotDiscovered")
 
 					// Find Health condition - should be False (execution failed)
-					var healthCondition *openapi.AdapterCondition
+					var healthCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeHealth {
 							healthCondition = &adapterStatus.Conditions[i]
@@ -773,7 +773,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(healthCondition).NotTo(BeNil(),
 						"adapter should have Health condition")
-					g.Expect(healthCondition.Status).To(Equal(openapi.AdapterConditionStatusFalse),
+					g.Expect(healthCondition.Status).To(Equal(core.AdapterConditionStatusFalse),
 						"Health should be False - discovery failed")
 					g.Expect(healthCondition.Reason).NotTo(BeNil())
 					g.Expect(*healthCondition.Reason).To(Equal("ExecutionFailed:resources"),
@@ -894,7 +894,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 					g.Expect(statuses.Items).NotTo(BeEmpty(), "adapter should have reported status")
 
 					// Find the test adapter status
-					var adapterStatus *openapi.AdapterStatus
+					var adapterStatus *core.AdapterStatus
 					for i, adapter := range statuses.Items {
 						if adapter.Adapter == adapterName {
 							adapterStatus = &statuses.Items[i]
@@ -910,7 +910,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 						"adapter should have observed_generation=1")
 
 					// Find Applied condition - should be True (ManifestWork created successfully)
-					var appliedCondition *openapi.AdapterCondition
+					var appliedCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeApplied {
 							appliedCondition = &adapterStatus.Conditions[i]
@@ -920,11 +920,11 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(appliedCondition).NotTo(BeNil(),
 						"adapter should have Applied condition")
-					g.Expect(appliedCondition.Status).To(Equal(openapi.AdapterConditionStatusTrue),
+					g.Expect(appliedCondition.Status).To(Equal(core.AdapterConditionStatusTrue),
 						"adapter Applied condition should be True since ManifestWork was created")
 
 					// Find Available condition - should be False (nested resources not discovered)
-					var availableCondition *openapi.AdapterCondition
+					var availableCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeAvailable {
 							availableCondition = &adapterStatus.Conditions[i]
@@ -934,12 +934,12 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(availableCondition).NotTo(BeNil(),
 						"adapter should have Available condition")
-					g.Expect(availableCondition.Status).To(Equal(openapi.AdapterConditionStatusFalse),
+					g.Expect(availableCondition.Status).To(Equal(core.AdapterConditionStatusFalse),
 						"adapter Available condition should be False since nested discovery returned empty")
 
 					// Find Health condition - should be True (adapter executed successfully)
 					// Note: Nested discovery failure doesn't affect Health - the adapter ran successfully
-					var healthCondition *openapi.AdapterCondition
+					var healthCondition *core.AdapterCondition
 					for i, condition := range adapterStatus.Conditions {
 						if condition.Type == client.ConditionTypeHealth {
 							healthCondition = &adapterStatus.Conditions[i]
@@ -949,7 +949,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 					g.Expect(healthCondition).NotTo(BeNil(),
 						"adapter should have Health condition")
-					g.Expect(healthCondition.Status).To(Equal(openapi.AdapterConditionStatusTrue),
+					g.Expect(healthCondition.Status).To(Equal(core.AdapterConditionStatusTrue),
 						"adapter Health condition should be True - nested discovery failure doesn't affect health")
 					g.Expect(healthCondition.Reason).NotTo(BeNil(),
 						"Health condition should have a reason")
@@ -1065,7 +1065,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 					g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
 					// Find the test adapter status
-					var adapterStatus *openapi.AdapterStatus
+					var adapterStatus *core.AdapterStatus
 					for _, adapter := range statuses.Items {
 						if adapter.Adapter == adapterName {
 							adapterStatus = &adapter

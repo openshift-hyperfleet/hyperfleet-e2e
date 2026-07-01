@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -29,7 +30,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] External K8s Resource Deletion
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			ginkgo.By("confirming managed K8s namespaces exist")
 			namespaces, err := h.K8sClient.FindNamespacesByPrefix(ctx, clusterID)
@@ -65,9 +66,9 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] External K8s Resource Deletion
 				}
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(statuses).To(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.Cluster, client.ConditionTypeFinalized, openapi.AdapterConditionStatusTrue))
+					h.Cfg.Adapters.Cluster, client.ConditionTypeFinalized, core.AdapterConditionStatusTrue))
 				g.Expect(statuses).To(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.Cluster, client.ConditionTypeHealth, openapi.AdapterConditionStatusTrue))
+					h.Cfg.Adapters.Cluster, client.ConditionTypeHealth, core.AdapterConditionStatusTrue))
 			}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 
 			ginkgo.By("verifying cluster is hard-deleted")

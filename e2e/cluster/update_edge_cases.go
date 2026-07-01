@@ -28,25 +28,25 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 			clusterID = *cluster.Id
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should coalesce multiple rapid updates and reconcile to the latest generation", func(ctx context.Context) {
 			ginkgo.By("sending three PATCH requests in rapid succession")
 			patch1, err := h.Client.PatchCluster(ctx, clusterID, openapi.ClusterPatchRequest{
-				Spec: &openapi.ClusterSpec{"update": "first"},
+				Labels: &map[string]string{"update": "first"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(patch1.Generation).To(Equal(int32(2)))
 
 			patch2, err := h.Client.PatchCluster(ctx, clusterID, openapi.ClusterPatchRequest{
-				Spec: &openapi.ClusterSpec{"update": "second"},
+				Labels: &map[string]string{"update": "second"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(patch2.Generation).To(Equal(int32(3)))
 
 			patch3, err := h.Client.PatchCluster(ctx, clusterID, openapi.ClusterPatchRequest{
-				Spec: &openapi.ClusterSpec{"update": "third"},
+				Labels: &map[string]string{"update": "third"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(patch3.Generation).To(Equal(int32(4)))
@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 
 				found := false
 				for _, cond := range finalCluster.Status.Conditions {
-					if cond.Type == client.ConditionTypeReconciled && cond.Status == openapi.ResourceConditionStatusTrue {
+					if cond.Type == client.ConditionTypeReconciled && cond.Status == openapi.True {
 						found = true
 						g.Expect(cond.ObservedGeneration).To(Equal(int32(4)))
 					}

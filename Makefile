@@ -43,15 +43,24 @@ help: ## Display this help
 
 ##@ Code Generation
 
+# Spec versions — bump when consuming new releases
+API_SPEC_VERSION ?= v1.0.25
+API_SPEC_TEMPLATE_VERSION ?= v1.0.27
+
 .PHONY: generate
 generate: $(OAPI_CODEGEN) ## Generate API client code from OpenAPI schema
-	$(GO) mod download
-	rm -rf pkg/api/openapi
-	mkdir -p pkg/api/openapi openapi
-	@rm -f openapi/openapi.yaml
-	@cp "$$($(GO) list -m -f '{{.Dir}}' github.com/openshift-hyperfleet/hyperfleet-api-spec)/schemas/core/openapi.yaml" openapi/openapi.yaml
+	rm -f pkg/api/openapi/openapi.gen.go pkg/api/core/core.gen.go
+	mkdir -p pkg/api/openapi pkg/api/core openapi
+	@rm -f openapi/openapi.yaml openapi/core-openapi.yaml
+	@echo "Downloading template spec ($(API_SPEC_TEMPLATE_VERSION))..."
+	@curl -sfL -o openapi/openapi.yaml \
+		"https://github.com/openshift-hyperfleet/hyperfleet-api-spec-template/releases/download/$(API_SPEC_TEMPLATE_VERSION)/template-openapi.yaml"
+	@echo "Downloading core spec ($(API_SPEC_VERSION))..."
+	@curl -sfL -o openapi/core-openapi.yaml \
+		"https://github.com/openshift-hyperfleet/hyperfleet-api-spec/releases/download/$(API_SPEC_VERSION)/core-openapi.yaml"
 	$(OAPI_CODEGEN) --config openapi/oapi-codegen.yaml openapi/openapi.yaml
-	@echo "✓ API client code generated in pkg/api/openapi/"
+	$(OAPI_CODEGEN) --config openapi/oapi-codegen-core.yaml openapi/core-openapi.yaml
+	@echo "✓ API client code generated in pkg/api/openapi/ and pkg/api/core/"
 
 ##@ Development
 
@@ -72,8 +81,8 @@ run: build ## Build and run with help
 clean: ## Remove build artifacts
 	rm -rf $(BIN_DIR)
 	rm -rf $(OUTPUT_DIR)
-	rm -f openapi/openapi.yaml
-	rm -rf pkg/api/openapi
+	rm -f openapi/openapi.yaml openapi/core-openapi.yaml
+	rm -f pkg/api/openapi/openapi.gen.go pkg/api/core/core.gen.go
 	rm -f coverage.out coverage.html
 
 ##@ Testing

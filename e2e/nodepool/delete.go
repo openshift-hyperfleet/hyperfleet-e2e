@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -41,7 +42,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 			})
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			ginkgo.By("creating nodepool and waiting for Reconciled")
 			np, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
@@ -50,7 +51,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 			nodepoolID = *np.Id
 
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should complete full deletion lifecycle from soft-delete through hard-delete", func(ctx context.Context) {
@@ -82,7 +83,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 				}
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(statuses).To(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.NodePool, client.ConditionTypeFinalized, openapi.AdapterConditionStatusTrue))
+					h.Cfg.Adapters.NodePool, client.ConditionTypeFinalized, core.AdapterConditionStatusTrue))
 			}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 
 			ginkgo.By("confirming nodepool is hard-deleted")
@@ -95,7 +96,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 			Expect(parentCluster.DeletedTime).To(BeNil(), "parent cluster should not have deleted_time")
 			Expect(parentCluster.Generation).To(Equal(parentBefore.Generation), "parent cluster generation should remain unchanged")
 
-			Expect(parentCluster).To(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue),
+			Expect(parentCluster).To(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True),
 				"parent cluster should remain Reconciled=True")
 		})
 

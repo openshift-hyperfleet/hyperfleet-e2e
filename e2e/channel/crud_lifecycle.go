@@ -6,7 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -16,7 +16,7 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 	func() {
 		var h *helper.Helper
 		var channelID string
-		var channel *client.Resource
+		var channel *openapi.Channel
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
@@ -72,10 +72,12 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 
 		ginkgo.It("should update channel via PATCH", func(ctx context.Context) {
 			ginkgo.By("patching channel spec")
-			patched, err := h.Client.PatchChannel(ctx, channelID, client.ResourcePatchRequest{
-				Spec: map[string]any{
-					"is_default":    true,
-					"enabled_regex": ".*",
+			isDefault := true
+			enabledRegex := ".*"
+			patched, err := h.Client.PatchChannel(ctx, channelID, openapi.ChannelPatchRequest{
+				Spec: &openapi.ChannelSpec{
+					IsDefault:    isDefault,
+					EnabledRegex: enabledRegex,
 				},
 			})
 			Expect(err).NotTo(HaveOccurred(), "failed to patch channel")
@@ -84,13 +86,13 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 			ginkgo.By("verifying patched spec via GET")
 			fetched, err := h.Client.GetChannel(ctx, channelID)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fetched.Spec["is_default"]).To(Equal(true))
+			Expect(fetched.Spec.IsDefault).To(BeTrue())
 		})
 
 		ginkgo.It("should update channel labels via PATCH", func(ctx context.Context) {
 			ginkgo.By("patching channel labels")
-			patched, err := h.Client.PatchChannel(ctx, channelID, client.ResourcePatchRequest{
-				Labels: map[string]string{
+			patched, err := h.Client.PatchChannel(ctx, channelID, openapi.ChannelPatchRequest{
+				Labels: &map[string]string{
 					"crud": channelID,
 				},
 			})

@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -95,13 +96,13 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				for i, clusterID := range clusterIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for cluster %d (%s) to become Reconciled...\n", i, clusterID)
 					Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 					cluster, err := h.Client.GetCluster(ctx, clusterID)
 					Expect(err).NotTo(HaveOccurred(), "failed to get cluster %d (%s)", i, clusterID)
 
 					hasAvailable := h.HasResourceCondition(cluster.Status.Conditions,
-						client.ConditionTypeLastKnownReconciled, openapi.ResourceConditionStatusTrue)
+						client.ConditionTypeLastKnownReconciled, openapi.True)
 					Expect(hasAvailable).To(BeTrue(),
 						"cluster %d (%s) should have LastKnownReconciled=True", i, clusterID)
 
@@ -127,7 +128,7 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 						g.Expect(statuses.Items).NotTo(BeEmpty(), "cluster %d (%s) should have adapter statuses", i, clusterID)
 
 						// Build adapter status map
-						adapterMap := make(map[string]openapi.AdapterStatus)
+						adapterMap := make(map[string]core.AdapterStatus)
 						for _, adapter := range statuses.Items {
 							adapterMap[adapter.Adapter] = adapter
 						}
@@ -139,15 +140,15 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 								"cluster %d (%s): required adapter %s should be present", i, clusterID, requiredAdapter)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeApplied, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeApplied, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"cluster %d (%s): adapter %s should have Applied=True", i, clusterID, requiredAdapter)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeAvailable, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeAvailable, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"cluster %d (%s): adapter %s should have Available=True", i, clusterID, requiredAdapter)
 
 							g.Expect(h.HasAdapterCondition(adapter.Conditions,
-								client.ConditionTypeHealth, openapi.AdapterConditionStatusTrue)).To(BeTrue(),
+								client.ConditionTypeHealth, core.AdapterConditionStatusTrue)).To(BeTrue(),
 								"cluster %d (%s): adapter %s should have Health=True", i, clusterID, requiredAdapter)
 						}
 					}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())

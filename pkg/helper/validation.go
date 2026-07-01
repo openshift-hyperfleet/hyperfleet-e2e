@@ -3,11 +3,12 @@ package helper
 import (
 	"strings"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 )
 
 // HasAdapterCondition checks if an adapter condition with the given type and status exists in the conditions list
-func (h *Helper) HasAdapterCondition(conditions []openapi.AdapterCondition, condType string, status openapi.AdapterConditionStatus) bool {
+func (h *Helper) HasAdapterCondition(conditions []core.AdapterCondition, condType string, status core.AdapterConditionStatus) bool {
 	return hasAdapterCond(conditions, condType, status)
 }
 
@@ -22,7 +23,7 @@ func (h *Helper) HasResourceCondition(conditions []openapi.ResourceCondition, co
 }
 
 // GetCondition retrieves a condition by type from the conditions list
-func (h *Helper) GetCondition(conditions []openapi.AdapterCondition, condType string) *openapi.AdapterCondition {
+func (h *Helper) GetCondition(conditions []core.AdapterCondition, condType string) *core.AdapterCondition {
 	for i := range conditions {
 		if conditions[i].Type == condType {
 			return &conditions[i]
@@ -32,9 +33,9 @@ func (h *Helper) GetCondition(conditions []openapi.AdapterCondition, condType st
 }
 
 // AllConditionsTrue checks if all specified condition types have status True
-func (h *Helper) AllConditionsTrue(conditions []openapi.AdapterCondition, condTypes []string) bool {
+func (h *Helper) AllConditionsTrue(conditions []core.AdapterCondition, condTypes []string) bool {
 	for _, condType := range condTypes {
-		if !h.HasAdapterCondition(conditions, condType, openapi.AdapterConditionStatusTrue) {
+		if !h.HasAdapterCondition(conditions, condType, core.AdapterConditionStatusTrue) {
 			return false
 		}
 	}
@@ -42,9 +43,9 @@ func (h *Helper) AllConditionsTrue(conditions []openapi.AdapterCondition, condTy
 }
 
 // AnyConditionFalse checks if any of the specified condition types have status False
-func (h *Helper) AnyConditionFalse(conditions []openapi.AdapterCondition, condTypes []string) bool {
+func (h *Helper) AnyConditionFalse(conditions []core.AdapterCondition, condTypes []string) bool {
 	for _, condType := range condTypes {
-		if h.HasAdapterCondition(conditions, condType, openapi.AdapterConditionStatusFalse) {
+		if h.HasAdapterCondition(conditions, condType, core.AdapterConditionStatusFalse) {
 			return true
 		}
 	}

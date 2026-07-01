@@ -7,6 +7,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
@@ -30,7 +31,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			ginkgo.By("creating two nodepools")
 			np1, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
@@ -45,10 +46,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 
 			ginkgo.By("waiting for both nodepools to reach Reconciled")
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID1), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID2), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should not affect sibling nodepool when one is deleted", func(ctx context.Context) {
@@ -66,20 +67,20 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			Expect(err).NotTo(HaveOccurred(), "sibling nodepool should still be accessible")
 			Expect(siblingNP.DeletedTime).To(BeNil(), "sibling nodepool should not have deleted_time")
 
-			hasReconciled := h.HasResourceCondition(siblingNP.Status.Conditions, client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)
+			hasReconciled := h.HasResourceCondition(siblingNP.Status.Conditions, client.ConditionTypeReconciled, openapi.True)
 			Expect(hasReconciled).To(BeTrue(), "sibling nodepool should remain Reconciled=True")
 
 			ginkgo.By("verifying sibling nodepool adapter statuses are intact")
 			Eventually(h.PollNodePoolAdapterStatuses(ctx, clusterID, nodepoolID2), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.NodePool, client.ConditionTypeApplied, openapi.AdapterConditionStatusTrue))
+					h.Cfg.Adapters.NodePool, client.ConditionTypeApplied, core.AdapterConditionStatusTrue))
 
 			ginkgo.By("verifying parent cluster is unaffected")
 			parentCluster, err := h.Client.GetCluster(ctx, clusterID)
 			Expect(err).NotTo(HaveOccurred(), "parent cluster should still exist")
 			Expect(parentCluster.DeletedTime).To(BeNil(), "parent cluster should not have deleted_time")
 
-			hasParentReconciled := h.HasResourceCondition(parentCluster.Status.Conditions, client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue)
+			hasParentReconciled := h.HasResourceCondition(parentCluster.Status.Conditions, client.ConditionTypeReconciled, openapi.True)
 			Expect(hasParentReconciled).To(BeTrue(), "parent cluster should remain Reconciled=True")
 		})
 

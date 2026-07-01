@@ -31,7 +31,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				})
 
 				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 				ginkgo.By("creating a nodepool")
 				np, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
@@ -42,11 +42,11 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 
 				ginkgo.By("waiting for Reconciled=True at generation 1")
 				Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 				ginkgo.By("PATCHing nodepool spec to trigger generation bump")
 				patched, err := h.Client.PatchNodePool(ctx, clusterID, nodepoolID, openapi.NodePoolPatchRequest{
-					Spec: &openapi.NodePoolSpec{"lifecycle-test": "updated"},
+					Labels: &map[string]string{"lifecycle-test": "updated"},
 				})
 				Expect(err).NotTo(HaveOccurred(), "PATCH should succeed")
 				Expect(patched).NotTo(BeNil(), "PATCH should return nodepool object")
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 					Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.NodePool, int32(2)))
 
 				Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 				ginkgo.By("soft-deleting the nodepool")
 				deletedNP, err := h.Client.DeleteNodePool(ctx, clusterID, nodepoolID)
@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				Expect(parentCluster).NotTo(BeNil(), "GET should return parent cluster object")
 				Expect(parentCluster.DeletedTime).To(BeNil(), "parent cluster should not be deleted")
 				Expect(parentCluster).To(helper.HaveResourceCondition(
-					client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue),
+					client.ConditionTypeReconciled, openapi.True),
 					"parent cluster should remain Reconciled=True")
 			})
 	},

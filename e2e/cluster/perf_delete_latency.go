@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Delete-to-hard-delete latency",
 
 			ginkgo.By("waiting for cluster to reach Reconciled before delete")
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should delete a cluster and reach hard-delete within acceptable latency", func(ctx context.Context) {

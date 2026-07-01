@@ -1,8 +1,8 @@
 {
   "spec": {
     "platform": {
-      "type": "gcp",
-      "gcp": {
+      "type": "template",
+      "template": {
         "projectID": "my-gcp-project",
         "region": "us-central1",
         "zone": "us-central1-a",

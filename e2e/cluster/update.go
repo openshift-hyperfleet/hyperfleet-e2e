@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 			})
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 		})
 
 		ginkgo.It("should update cluster via PATCH, trigger reconciliation, and reach Reconciled at new generation", func(ctx context.Context) {
@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 			Expect(err).NotTo(HaveOccurred(), "PATCH request should succeed")
 			expectedGen := clusterBefore.Generation + 1
 			Expect(patchedCluster.Generation).To(Equal(expectedGen), "generation should increment after PATCH")
-			Expect(patchedCluster.Spec).To(HaveKey("dns"),
+			Expect(patchedCluster.Spec.Dns).NotTo(BeNil(),
 				"PATCH response should reflect updated spec fields")
 
 			ginkgo.By("waiting for all adapters to reconcile at new generation")
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 
 				found := false
 				for _, cond := range finalCluster.Status.Conditions {
-					if cond.Type == client.ConditionTypeReconciled && cond.Status == openapi.ResourceConditionStatusTrue {
+					if cond.Type == client.ConditionTypeReconciled && cond.Status == openapi.True {
 						found = true
 						g.Expect(cond.ObservedGeneration).To(Equal(expectedGen), "Reconciled condition observed_generation should match expected")
 					}

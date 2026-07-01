@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Create-to-reconciled latency",
 			})
 
 			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 			elapsed := time.Since(start)
 			ginkgo.GinkgoWriter.Printf("[PERF] Cluster create-to-reconciled latency: %v\n", elapsed)

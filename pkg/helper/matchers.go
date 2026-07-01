@@ -6,6 +6,7 @@ import (
 
 	"github.com/onsi/gomega/types"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/core"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 )
@@ -49,7 +50,7 @@ func (m *resourceConditionMatcher) NegatedFailureMessage(_ any) string {
 
 // HaveAllAdaptersWithCondition matches an *AdapterStatusList where every required
 // adapter has the specified condition type and status.
-func HaveAllAdaptersWithCondition(requiredAdapters []string, condType string, status openapi.AdapterConditionStatus) types.GomegaMatcher {
+func HaveAllAdaptersWithCondition(requiredAdapters []string, condType string, status core.AdapterConditionStatus) types.GomegaMatcher {
 	return &allAdaptersConditionMatcher{
 		adapters: requiredAdapters,
 		condType: condType,
@@ -60,12 +61,12 @@ func HaveAllAdaptersWithCondition(requiredAdapters []string, condType string, st
 type allAdaptersConditionMatcher struct {
 	adapters []string
 	condType string
-	status   openapi.AdapterConditionStatus
+	status   core.AdapterConditionStatus
 	missing  []string
 }
 
 func (m *allAdaptersConditionMatcher) Match(actual any) (bool, error) {
-	list, ok := actual.(*openapi.AdapterStatusList)
+	list, ok := actual.(*core.AdapterStatusList)
 	if !ok {
 		return false, fmt.Errorf("HaveAllAdaptersWithCondition expects *AdapterStatusList, got %T", actual)
 	}
@@ -74,7 +75,7 @@ func (m *allAdaptersConditionMatcher) Match(actual any) (bool, error) {
 	}
 
 	m.missing = nil
-	adapterMap := make(map[string]openapi.AdapterStatus, len(list.Items))
+	adapterMap := make(map[string]core.AdapterStatus, len(list.Items))
 	for _, s := range list.Items {
 		adapterMap[s.Adapter] = s
 	}
@@ -116,7 +117,7 @@ type allAdaptersGenerationMatcher struct {
 }
 
 func (m *allAdaptersGenerationMatcher) Match(actual any) (bool, error) {
-	list, ok := actual.(*openapi.AdapterStatusList)
+	list, ok := actual.(*core.AdapterStatusList)
 	if !ok {
 		return false, fmt.Errorf("HaveAllAdaptersAtGeneration expects *AdapterStatusList, got %T", actual)
 	}
@@ -125,7 +126,7 @@ func (m *allAdaptersGenerationMatcher) Match(actual any) (bool, error) {
 	}
 
 	m.failures = nil
-	adapterMap := make(map[string]openapi.AdapterStatus, len(list.Items))
+	adapterMap := make(map[string]core.AdapterStatus, len(list.Items))
 	for _, s := range list.Items {
 		adapterMap[s.Adapter] = s
 	}
@@ -141,7 +142,7 @@ func (m *allAdaptersGenerationMatcher) Match(actual any) (bool, error) {
 			continue
 		}
 		for _, ct := range []string{client.ConditionTypeApplied, client.ConditionTypeAvailable, client.ConditionTypeHealth} {
-			if !hasAdapterCond(adapter.Conditions, ct, openapi.AdapterConditionStatusTrue) {
+			if !hasAdapterCond(adapter.Conditions, ct, core.AdapterConditionStatusTrue) {
 				m.failures = append(m.failures, fmt.Sprintf("%s: %s!=True", name, ct))
 			}
 		}
@@ -157,7 +158,7 @@ func (m *allAdaptersGenerationMatcher) NegatedFailureMessage(_ any) string {
 	return fmt.Sprintf("expected adapters NOT at generation %d", m.generation)
 }
 
-func hasAdapterCond(conditions []openapi.AdapterCondition, condType string, status openapi.AdapterConditionStatus) bool {
+func hasAdapterCond(conditions []core.AdapterCondition, condType string, status core.AdapterConditionStatus) bool {
 	for _, c := range conditions {
 		if c.Type == condType && c.Status == status {
 			return true

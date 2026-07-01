@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				h.DeferClusterCleanup(clusterID)
 
 				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
-					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 				ginkgo.By("Create a nodepool and wait for Reconciled")
 				np, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
@@ -45,7 +45,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				nodepoolID := *np.Id
 
 				Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
-					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.ResourceConditionStatusTrue))
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, openapi.True))
 
 				// --- Simulate stuck deletion by scaling down an existing cluster adapter ---
 
@@ -80,7 +80,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 					g.Expect(err).NotTo(HaveOccurred(), "cluster should still be accessible")
 					g.Expect(cl.DeletedTime).NotTo(BeNil(), "cluster should still be soft-deleted")
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
-						client.ConditionTypeReconciled, openapi.ResourceConditionStatusFalse)).To(BeTrue(),
+						client.ConditionTypeReconciled, openapi.False)).To(BeTrue(),
 						"Reconciled should be False while stuck")
 				}, h.Cfg.Timeouts.Adapter.Processing/2, h.Cfg.Polling.Interval).Should(Succeed())
 

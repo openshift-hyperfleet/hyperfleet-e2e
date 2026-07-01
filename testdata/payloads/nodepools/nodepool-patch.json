@@ -1,10 +1,13 @@
 {
   "spec": {
-    "replicas": 3,
-    "machineType": "n1-standard-16",
-    "labels": {
-      "node-role": "worker",
-      "gpu-enabled": "true"
+    "nodeCount": 3,
+    "platform": {
+      "type": "template",
+      "template": {
+        "machineType": "n1-standard-16",
+        "diskType": "pd-ssd",
+        "diskSizeGb": 200
+      }
     }
   }
 }

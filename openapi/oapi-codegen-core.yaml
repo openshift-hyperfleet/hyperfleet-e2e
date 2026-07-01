@@ -1,0 +1,11 @@
+package: core
+output: pkg/api/core/core.gen.go
+
+generate:
+  models: true
+  client: false
+  chi-server: false
+  embedded-spec: false
+
+output-options:
+  skip-prune: false

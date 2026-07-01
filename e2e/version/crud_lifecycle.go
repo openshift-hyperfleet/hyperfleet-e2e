@@ -6,7 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/api/openapi"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -17,7 +17,7 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 		var h *helper.Helper
 		var channelID string
 		var versionID string
-		var version *client.Resource
+		var version *openapi.Version
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
@@ -80,12 +80,12 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 
 		ginkgo.It("should update version via PATCH", func(ctx context.Context) {
 			ginkgo.By("patching version spec")
-			patched, err := h.Client.PatchVersion(ctx, channelID, versionID, client.ResourcePatchRequest{
-				Spec: map[string]any{
-					"raw_version":   "4.18.0",
-					"enabled":       true,
-					"is_default":    true,
-					"release_image": "quay.io/openshift-release-dev/ocp-release:4.18.0",
+			patched, err := h.Client.PatchVersion(ctx, channelID, versionID, openapi.VersionPatchRequest{
+				Spec: &openapi.VersionSpec{
+					RawVersion:   "4.18.0",
+					Enabled:      true,
+					IsDefault:    true,
+					ReleaseImage: "quay.io/openshift-release-dev/ocp-release:4.18.0",
 				},
 			})
 			Expect(err).NotTo(HaveOccurred(), "failed to patch version")
@@ -94,14 +94,14 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 			ginkgo.By("verifying patched spec via GET")
 			fetched, err := h.Client.GetVersion(ctx, channelID, versionID)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(fetched.Spec["is_default"]).To(Equal(true))
-			Expect(fetched.Spec["raw_version"]).To(Equal("4.18.0"))
+			Expect(fetched.Spec.IsDefault).To(BeTrue())
+			Expect(fetched.Spec.RawVersion).To(Equal("4.18.0"))
 		})
 
 		ginkgo.It("should update version labels via PATCH", func(ctx context.Context) {
 			ginkgo.By("patching version labels")
-			patched, err := h.Client.PatchVersion(ctx, channelID, versionID, client.ResourcePatchRequest{
-				Labels: map[string]string{
+			patched, err := h.Client.PatchVersion(ctx, channelID, versionID, openapi.VersionPatchRequest{
+				Labels: &map[string]string{
 					"crud": versionID,
 				},
 			})
