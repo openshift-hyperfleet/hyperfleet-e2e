@@ -6,8 +6,8 @@ params:
     source: "event.id"
     type: "string"
     required: true
-  - name: "e2eRunId"
-    source: "env.E2E_RUN_ID"
+  - name: "runId"
+    source: "env.RUN_ID"
     type: "string"
     required: false
 
@@ -53,7 +53,7 @@ resources:
         labels:
           hyperfleet.io/cluster-id: "{{ .clusterId }}"
           hyperfleet.io/cluster-name: "{{ .clusterName }}"
-          e2e.hyperfleet.io/run-id: "{{ .e2eRunId }}"
+          e2e.hyperfleet.io/run-id: "{{ .runId }}"
         annotations:
           hyperfleet.io/generation: "{{ .generationSpec }}"
     discovery:

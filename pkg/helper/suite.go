@@ -63,10 +63,10 @@ const maxRunIDLength = 63
 var labelValueRegex = regexp.MustCompile(`^[a-zA-Z0-9]([-_.a-zA-Z0-9]*[a-zA-Z0-9])?$`)
 
 // GetE2ETestRunID returns the run identifier for this E2E test suite execution.
-// It reads the E2E_RUN_ID environment variable (set by CI/prow to the namespace name).
-// Returns empty string if E2E_RUN_ID is not set (run-id is optional).
+// It reads the RUN_ID environment variable (set by CI/prow to the namespace name).
+// Returns empty string if RUN_ID is not set (run-id is optional).
 func GetE2ETestRunID() (string, error) {
-	id := os.Getenv("E2E_RUN_ID")
+	id := os.Getenv("RUN_ID")
 	if id == "" {
 		// Run ID is optional - return empty string
 		return "", nil
@@ -74,10 +74,10 @@ func GetE2ETestRunID() (string, error) {
 
 	// Validate run ID format and length
 	if len(id) > maxRunIDLength {
-		return "", fmt.Errorf("E2E_RUN_ID %q is %d characters, exceeds the %d-character Kubernetes label value limit", id, len(id), maxRunIDLength)
+		return "", fmt.Errorf("RUN_ID %q is %d characters, exceeds the %d-character Kubernetes label value limit", id, len(id), maxRunIDLength)
 	}
 	if !labelValueRegex.MatchString(id) {
-		return "", fmt.Errorf("E2E_RUN_ID %q contains characters invalid for a Kubernetes label value", id)
+		return "", fmt.Errorf("RUN_ID %q contains characters invalid for a Kubernetes label value", id)
 	}
 	return id, nil
 }

@@ -30,7 +30,7 @@ var args struct {
 	junitReport   string
 	dryRun        bool
 	flakeAttempts int
-	e2eRunID      string
+	runId         string
 }
 
 func init() {
@@ -49,13 +49,13 @@ func init() {
 		"List matching specs without executing them")
 	pfs.IntVar(&args.flakeAttempts, "flake-attempts", 1,
 		"Number of attempts for flaky tests (1 = no retries, 3 = up to 2 retries)")
-	pfs.StringVar(&args.e2eRunID, "e2e-run-id", "",
-		"E2E run ID for labeling test resources (overrides E2E_RUN_ID env var; optional)")
+	pfs.StringVar(&args.runId, "run-id", "",
+		"E2E run ID for labeling test resources (overrides RUN_ID env var; optional)")
 }
 
 func run(cmd *cobra.Command, argv []string) {
 	if err := common.LoadConfig(common.ConfigFile); err != nil {
-		log.Printf("Error loading config: %v\n", err)
+		log.Printf("Errr loading config: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -91,11 +91,11 @@ func run(cmd *cobra.Command, argv []string) {
 		os.Exit(1)
 	}
 
-	// If --e2e-run-id was provided, inject it into the environment so
+	// If --run-id was provided, inject it into the environment so
 	// GetE2ETestRunID() picks it up.
-	if args.e2eRunID != "" {
-		if err := os.Setenv("E2E_RUN_ID", args.e2eRunID); err != nil {
-			log.Printf("Failed to set E2E_RUN_ID: %v\n", err)
+	if args.runId != "" {
+		if err := os.Setenv("RUN_ID", args.runId); err != nil {
+			log.Printf("Failed to set RUN_ID: %v\n", err)
 			os.Exit(1)
 		}
 	}

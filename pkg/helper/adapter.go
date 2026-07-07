@@ -195,11 +195,11 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 	)
 
 	// The run ID (h.RunID) is passed to Helm via --set labels.e2e\.hyperfleet\.io/run-id=<run-id> to label deployed adapter
-	// and injected into the adapter container as env.E2E_RUN_ID so the adapter can read it via its task config.
+	// and injected into the adapter container as env.RUN_ID so the adapter can read it via its task config.
 	if h.RunID != "" {
 		helmArgs = append(helmArgs,
 			"--set", fmt.Sprintf("labels.e2e\\.hyperfleet\\.io/run-id=%s", h.RunID),
-			"--set", "env[0].name=E2E_RUN_ID",
+			"--set", "env[0].name=RUN_ID",
 			"--set", fmt.Sprintf("env[0].value=%s", h.RunID),
 		)
 		logger.Info("injecting run ID into Helm chart",
