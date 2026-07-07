@@ -17,6 +17,11 @@ params:
     source: "env.NAMESPACE"
     type: "string"
 
+  - name: "e2eRunId"
+    source: "env.E2E_RUN_ID"
+    type: "string"
+    required: false
+
 
 # Preconditions without API calls (API URL is unreachable in this test)
 # Use only parameter-based values to avoid API dependency
@@ -50,6 +55,7 @@ resources:
           hyperfleet.io/component: "infrastructure"
           hyperfleet.io/generation: "{{ .generation }}"
           hyperfleet.io/resource-group: "cluster-setup"
+          e2e.hyperfleet.io/run-id: "{{ .e2eRunId }}"
 
           # Maestro-specific labels
           maestro.io/source-id: "{{ .adapter.name }}"
@@ -99,6 +105,7 @@ resources:
                 app.kubernetes.io/instance: "{{ .adapter.name }}"
                 app.kubernetes.io/name: cl-maestro
                 app.kubernetes.io/transport: maestro
+                e2e.hyperfleet.io/run-id: "{{ .e2eRunId }}"
               annotations:
                 hyperfleet.io/generation: "{{ .generation }}"
           - apiVersion: v1
@@ -115,6 +122,7 @@ resources:
                 app.kubernetes.io/name: cl-maestro
                 app.kubernetes.io/version: 1.0.0
                 app.kubernetes.io/transport: maestro
+                e2e.hyperfleet.io/run-id: "{{ .e2eRunId }}"
               annotations:
                 hyperfleet.io/generation: "{{ .generation }}"
 

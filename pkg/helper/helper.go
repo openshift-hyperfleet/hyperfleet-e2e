@@ -23,6 +23,7 @@ type Helper struct {
 	Client        *client.HyperFleetClient
 	K8sClient     *k8sclient.Client
 	MaestroClient *maestro.Client
+	RunID         string
 }
 
 // TestDataPath resolves a relative path within the testdata directory

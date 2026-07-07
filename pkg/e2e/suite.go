@@ -38,10 +38,25 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	cfg.Display()
 
-	logger.Info("starting hyperfleet-e2e test suite - each test creates temporary resources")
+	// Get run ID (optional - empty string if not set)
+	runID, err := helper.GetE2ETestRunID()
+	if err != nil {
+		log.Fatalf("Failed to get run ID: %v", err)
+	}
+	helper.SetRunID(runID)
+
+	if runID != "" {
+		logger.Info("starting hyperfleet-e2e test suite",
+			"run_id", runID,
+			"message", "each test creates temporary resources")
+	} else {
+		logger.Info("starting hyperfleet-e2e test suite",
+			"message", "each test creates temporary resources (no run-id set)")
+	}
 })
 
 var _ = ginkgo.AfterSuite(func() {
+	runID := helper.GetRunID()
 	helper.ClearSuiteConfig()
-	logger.Info("test suite completed")
+	logger.Info("test suite completed", "run_id", runID)
 })

@@ -21,14 +21,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// generateRandomString generates a random alphanumeric string of the specified length
-func generateRandomString(length int) string {
+// randomAlphanumeric returns a random lowercase alphanumeric string of the given length.
+func randomAlphanumeric(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, length)
 	for i := range b {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			// Fallback: use current time nanoseconds for basic randomness
 			b[i] = charset[(time.Now().UnixNano()+int64(i))%int64(len(charset))]
 		} else {
 			b[i] = charset[n.Int64()]
@@ -195,6 +194,19 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 		"--set", fmt.Sprintf("fullnameOverride=%s", releaseName),
 	)
 
+	// The run ID (h.RunID) is passed to Helm via --set labels.e2e\.hyperfleet\.io/run-id=<run-id> to label deployed adapter
+	// and injected into the adapter container as env.E2E_RUN_ID so the adapter can read it via its task config.
+	if h.RunID != "" {
+		helmArgs = append(helmArgs,
+			"--set", fmt.Sprintf("labels.e2e\\.hyperfleet\\.io/run-id=%s", h.RunID),
+			"--set", "env[0].name=E2E_RUN_ID",
+			"--set", fmt.Sprintf("env[0].value=%s", h.RunID),
+		)
+		logger.Info("injecting run ID into Helm chart",
+			"run_id", h.RunID,
+			"release_name", releaseName)
+	}
+
 	// Override image pull policy if set (e.g. IfNotPresent for local kind clusters)
 	if policy := os.Getenv("IMAGE_PULL_POLICY"); policy != "" {
 		helmArgs = append(helmArgs, "--set", fmt.Sprintf("image.pullPolicy=%s", policy))
@@ -327,7 +339,7 @@ func (h *Helper) cleanupClusterScopedResources(ctx context.Context, releaseName 
 // outputDir is configured via OUTPUT_DIR env var or config file (defaults to "output")
 func (h *Helper) saveDiagnosticLogs(ctx context.Context, adapterName, releaseName, namespace string) {
 	// Generate output directory with adapter name and random suffix
-	randomSuffix := generateRandomString(4)
+	randomSuffix := randomAlphanumeric(4)
 	outputDir := filepath.Join(h.Cfg.OutputDir, fmt.Sprintf("%s-%s", adapterName, randomSuffix))
 
 	// Create output directory
