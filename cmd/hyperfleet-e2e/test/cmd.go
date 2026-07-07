@@ -55,7 +55,7 @@ func init() {
 
 func run(cmd *cobra.Command, argv []string) {
 	if err := common.LoadConfig(common.ConfigFile); err != nil {
-		log.Printf("Errr loading config: %v\n", err)
+		log.Printf("Error loading config: %v\n", err)
 		os.Exit(1)
 	}
 
