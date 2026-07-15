@@ -25,6 +25,7 @@ const (
 // Functionality labels - Feature category dimension: describes test coverage target
 const (
 	Upgrade = "upgrade" // Version compatibility: smooth upgrades
+	Auth    = "auth"    // Authentication: JWT auth validation
 )
 
 // Constraint labels - Execution constraint dimension: determines scheduling strategy

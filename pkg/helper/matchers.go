@@ -1,7 +1,11 @@
 package helper
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
+	"net/http"
 	"strings"
 
 	"github.com/onsi/gomega/types"
@@ -239,4 +243,61 @@ func formatResourceConditions(conditions []openapi.ResourceCondition) string {
 		parts = append(parts, fmt.Sprintf("%s=%s", c.Type, c.Status))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// HaveRFC9457Error matches an *http.Response whose body is an RFC 9457 Problem Details
+// JSON object with the expected HYPERFLEET error code (e.g. "HYPERFLEET-AUT-001").
+// It also asserts Content-Type contains "application/problem+json".
+func HaveRFC9457Error(expectedCode string) types.GomegaMatcher {
+	return &rfc9457ErrorMatcher{expectedCode: expectedCode}
+}
+
+type rfc9457ErrorMatcher struct {
+	expectedCode string
+	actual       string // for failure messages
+	body         string
+}
+
+func (m *rfc9457ErrorMatcher) Match(actual any) (bool, error) {
+	resp, ok := actual.(*http.Response)
+	if !ok {
+		return false, fmt.Errorf("HaveRFC9457Error expects *http.Response, got %T", actual)
+	}
+
+	// Read body first so FailureMessage always has diagnostic content.
+	if resp.Body != nil {
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, fmt.Errorf("failed to read response body: %w", err)
+		}
+		m.body = string(bodyBytes)
+	}
+
+	mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if mediaType != "application/problem+json" {
+		m.actual = fmt.Sprintf("Content-Type=%q (not application/problem+json)", resp.Header.Get("Content-Type"))
+		return false, nil
+	}
+
+	var problem openapi.ProblemDetails
+	if err := json.Unmarshal([]byte(m.body), &problem); err != nil {
+		m.actual = fmt.Sprintf("body is not valid ProblemDetails JSON: %s", m.body)
+		return false, nil
+	}
+
+	if problem.Code == nil {
+		m.actual = "ProblemDetails.code is nil"
+		return false, nil
+	}
+
+	m.actual = *problem.Code
+	return *problem.Code == m.expectedCode, nil
+}
+
+func (m *rfc9457ErrorMatcher) FailureMessage(_ any) string {
+	return fmt.Sprintf("expected RFC 9457 error code %q but got: %s\nbody: %s", m.expectedCode, m.actual, m.body)
+}
+
+func (m *rfc9457ErrorMatcher) NegatedFailureMessage(_ any) string {
+	return fmt.Sprintf("expected RFC 9457 error code NOT to be %q", m.expectedCode)
 }
