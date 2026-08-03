@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"net/http"
-	"os"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
@@ -15,58 +14,29 @@ import (
 
 var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Unable to Finalize Prevents Hard-Delete",
 	ginkgo.Serial, // Serial: deploys stuck adapter that blocks deletion of all clusters
-	ginkgo.Label(labels.Tier2, labels.Negative),
+	ginkgo.Label(labels.Tier2, labels.Negative, labels.Adapter),
 	func() {
 		var (
-			h                *helper.Helper
-			adapterChartPath string
-			apiChartPath     string
-			baseDeployOpts   helper.AdapterDeploymentOptions
+			h              *helper.Helper
+			baseDeployOpts helper.AdapterDeploymentOptions
+			apiPath        string
 		)
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
 
-			ginkgo.By("Clone adapter Helm chart repository")
-			var cleanupAdapterChart func() error
-			var err error
-			adapterChartPath, cleanupAdapterChart, err = h.CloneHelmChart(ctx, helper.HelmChartCloneOptions{
-				Component: "adapter",
-				RepoURL:   h.Cfg.AdapterDeployment.ChartRepo,
-				Ref:       h.Cfg.AdapterDeployment.ChartRef,
-				ChartPath: h.Cfg.AdapterDeployment.ChartPath,
-				WorkDir:   helper.TestWorkDir,
-			})
+			// Clone Adapter Chart
+			path, err := helper.AdapterGitClone.CloneChartOnce(ctx)
 			Expect(err).NotTo(HaveOccurred(), "failed to clone adapter Helm chart")
+			ginkgo.GinkgoWriter.Printf("Cloned adapter chart to: %s\n", path)
 
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				ginkgo.By("Cleanup cloned adapter Helm chart")
-				if err := cleanupAdapterChart(); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup adapter chart: %v\n", err)
-				}
-			})
+			apiPath, err = helper.APIGitClone.CloneChartOnce(ctx)
+			Expect(err).NotTo(HaveOccurred(), "failed to clone api helm chart")
+			ginkgo.GinkgoWriter.Printf("Cloned api chart to: %s\n", apiPath)
 
-			ginkgo.By("Clone API Helm chart repository")
-			var cleanupAPIChart func() error
-			apiChartPath, cleanupAPIChart, err = h.CloneHelmChart(ctx, helper.HelmChartCloneOptions{
-				Component: "api",
-				RepoURL:   h.Cfg.APIDeployment.ChartRepo,
-				Ref:       h.Cfg.APIDeployment.ChartRef,
-				ChartPath: h.Cfg.APIDeployment.ChartPath,
-				WorkDir:   helper.TestWorkDir,
-			})
-			Expect(err).NotTo(HaveOccurred(), "failed to clone API Helm chart")
-
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				ginkgo.By("Cleanup cloned API Helm chart")
-				if err := cleanupAPIChart(); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup API chart: %v\n", err)
-				}
-			})
-
+			// Set up base deployment options with common fields
 			baseDeployOpts = helper.AdapterDeploymentOptions{
-				Namespace:    h.Cfg.Namespace,
-				ChartPath:    adapterChartPath,
+				ChartPath:    path,
 				ResourceType: helper.ResourceTypeClusters,
 			}
 		})
@@ -74,35 +44,22 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 		ginkgo.It("should prevent hard-delete when an adapter cannot finalize",
 			func(ctx context.Context) {
 				adapterName := "cl-stuck"
-
-				err := os.Setenv("ADAPTER_NAME", adapterName)
-				Expect(err).NotTo(HaveOccurred(), "failed to set ADAPTER_NAME environment variable")
-				ginkgo.DeferCleanup(func() {
-					_ = os.Unsetenv("ADAPTER_NAME")
-				})
-
 				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
 
-				ginkgo.By("Deploy dedicated stuck-adapter")
+				ginkgo.By("Deploy test stuck adapter")
+
 				deployOpts := baseDeployOpts
 				deployOpts.ReleaseName = releaseName
 				deployOpts.AdapterName = adapterName
 
-				err = h.DeployAdapter(ctx, deployOpts)
+				err := h.InstallAdapter(ctx, deployOpts)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
-					ginkgo.By("Uninstall stuck-adapter")
-					if err := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", releaseName, err)
-					}
-					if h.Cfg.BrokerType == "googlepubsub" {
-						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, adapterName, deployOpts.ResourceType); err != nil {
-							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
-						}
+					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter: %v\n", err)
 					}
 				})
-				Expect(err).NotTo(HaveOccurred(), "failed to deploy stuck-adapter")
-				ginkgo.GinkgoWriter.Printf("Deployed stuck-adapter: release=%s\n", releaseName)
+				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")
+				ginkgo.GinkgoWriter.Printf("Successfully deployed adapter: %s (release: %s)\n", adapterName, releaseName)
 
 				ginkgo.By("Upgrade API to add stuck-adapter to required adapters")
 				originalAdapters := h.GetAPIRequiredClusterAdapters()
@@ -111,12 +68,12 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 				// Register API config restore AFTER adapter cleanup registration (LIFO → executes FIRST)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Restore API required adapters to original config")
-					if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, apiChartPath, h.Cfg.Namespace, originalAdapters, 3); err != nil {
+					if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, apiPath, h.Cfg.Namespace, originalAdapters, 3); err != nil {
 						ginkgo.GinkgoWriter.Printf("CRITICAL: %v\n", err)
 					}
 				})
 
-				err = h.UpgradeAPIRequiredAdapters(ctx, apiChartPath, h.Cfg.Namespace, updatedAdapters)
+				err = h.UpgradeAPIRequiredAdapters(ctx, apiPath, h.Cfg.Namespace, updatedAdapters)
 				Expect(err).NotTo(HaveOccurred(), "failed to upgrade API with stuck-adapter in required adapters")
 
 				deploymentName, err := h.GetDeploymentName(ctx, h.Cfg.Namespace, releaseName)

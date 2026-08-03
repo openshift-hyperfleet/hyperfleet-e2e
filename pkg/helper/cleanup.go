@@ -98,7 +98,7 @@ func CleanupKubeResources() {
 	defer cancel()
 
 	// Step 1: Remove all helm releases installed with the given label selector
-	helmClient := helm.NewClient(c.cfg.Namespace)
+	helmClient := helm.NewHelmClient(c.cfg.Namespace)
 	releases, err := helmClient.ListReleasesBySelector(c.labelSelectorListOptions.LabelSelector)
 	if err != nil {
 		// Failed to list releases, so skipping uninstall
@@ -107,7 +107,7 @@ func CleanupKubeResources() {
 	} else {
 		logger.Info("found helm releases", "count", len(releases))
 		for _, release := range releases {
-			err := helmClient.UninstallRelease(ctx, release, c.cfg.Namespace)
+			err := helmClient.UninstallRelease(release)
 			if err != nil {
 				logger.Error("failed to uninstall helm release", "name", release, "error", err)
 				continue
@@ -128,9 +128,7 @@ func (c *CleanupHelper) SweepPubsubTestAdapterResources(ctx context.Context) err
 	// Get a snapshot of the adapter deployment list to avoid race conditions
 	deployments := c.adapterDeploymentList.Snapshot()
 	var errorList []string
-	for _, deployment := range deployments {
-		resourceType := deployment.ResourceType
-		adapterName := deployment.AdapterName
+	for adapterName, resourceType := range deployments {
 		namespace := c.cfg.Namespace
 		projectID := c.cfg.GCPProjectID
 		topicID := fmt.Sprintf("%s-%s-%s-dlq", namespace, resourceType, adapterName)

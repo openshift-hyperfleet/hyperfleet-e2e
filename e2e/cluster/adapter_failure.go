@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"os"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
@@ -14,43 +13,24 @@ import (
 
 var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter Failure in Top-Level Status",
 	ginkgo.Serial, // Serial: deploys temp adapter subscribing to all events, causes cross-talk
-	ginkgo.Label(labels.Tier1, labels.Negative),
+	ginkgo.Label(labels.Tier1, labels.Negative, labels.Adapter),
 	func() {
 		var (
 			h              *helper.Helper
-			chartPath      string
 			baseDeployOpts helper.AdapterDeploymentOptions
 		)
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
 
-			// Clone adapter Helm chart repository (shared across all tests in this Describe)
-			ginkgo.By("Clone adapter Helm chart repository")
-			var cleanupChart func() error
-			var err error
-			chartPath, cleanupChart, err = h.CloneHelmChart(ctx, helper.HelmChartCloneOptions{
-				Component: "adapter",
-				RepoURL:   h.Cfg.AdapterDeployment.ChartRepo,
-				Ref:       h.Cfg.AdapterDeployment.ChartRef,
-				ChartPath: h.Cfg.AdapterDeployment.ChartPath,
-				WorkDir:   helper.TestWorkDir,
-			})
+			// Clone Adapter Chart
+			path, err := helper.AdapterGitClone.CloneChartOnce(ctx)
 			Expect(err).NotTo(HaveOccurred(), "failed to clone adapter Helm chart")
-			ginkgo.GinkgoWriter.Printf("Cloned adapter chart to: %s\n", chartPath)
-
-			// Ensure chart cleanup after test
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				ginkgo.By("Cleanup cloned Helm chart")
-				if err := cleanupChart(); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup chart: %v\n", err)
-				}
-			})
+			ginkgo.GinkgoWriter.Printf("Cloned adapter chart to: %s\n", path)
 
 			// Set up base deployment options with common fields
 			baseDeployOpts = helper.AdapterDeploymentOptions{
-				Namespace:    h.Cfg.Namespace,
-				ChartPath:    chartPath,
+				ChartPath:    path,
 				ResourceType: helper.ResourceTypeClusters,
 			}
 		})
@@ -58,14 +38,6 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 		ginkgo.It("should not block cluster reconciliation when non-required adapter has param extraction failure",
 			func(ctx context.Context) {
 				adapterName := "cl-param-error"
-
-				// Set environment variable for envsubst expansion in values.yaml
-				err := os.Setenv("ADAPTER_NAME", adapterName)
-				Expect(err).NotTo(HaveOccurred(), "failed to set ADAPTER_NAME environment variable")
-				ginkgo.DeferCleanup(func() {
-					_ = os.Unsetenv("ADAPTER_NAME")
-				})
-
 				// Generate unique release name for this deployment
 				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
 
@@ -76,25 +48,14 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				deployOpts.ReleaseName = releaseName
 				deployOpts.AdapterName = adapterName
 
-				err = h.DeployAdapter(ctx, deployOpts)
-				// Ensure adapter cleanup happens after this test
+				err := h.InstallAdapter(ctx, deployOpts)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
-					ginkgo.By("Uninstall cl-param-error adapter")
-					if err := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", releaseName, err)
-					} else {
-						ginkgo.GinkgoWriter.Printf("Successfully uninstalled adapter: %s\n", releaseName)
-					}
-
-					if h.Cfg.BrokerType == "googlepubsub" {
-						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, adapterName, deployOpts.ResourceType); err != nil {
-							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
-						}
+					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter: %v\n", err)
 					}
 				})
-				Expect(err).NotTo(HaveOccurred(), "failed to deploy cl-param-error adapter")
-				ginkgo.GinkgoWriter.Printf("Deployed cl-param-error adapter: release=%s\n", releaseName)
+				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")
+				ginkgo.GinkgoWriter.Printf("Successfully deployed adapter: %s (release: %s)\n", adapterName, releaseName)
 
 				// Create cluster after adapter is deployed
 				ginkgo.By("Submit an API request to create a Cluster resource")

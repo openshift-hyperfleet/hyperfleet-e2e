@@ -1,0 +1,28 @@
+broker:
+  type: "{{ .BrokerType }}"
+  create: true
+  googlepubsub:
+    projectId: "{{ .ProjectId }}"
+    subscriptionId: "{{ .Namespace }}-clusters-{{ .AdapterName }}"
+    topic: "{{ .Namespace }}-clusters"
+    deadLetterTopic: "{{ .Namespace }}-clusters-dlq"
+    createTopicIfMissing: {{ .AdapterGooglepubsubCreateTopicIfMissing }}
+    createSubscriptionIfMissing: {{ .AdapterGooglepubsubCreateSubscriptionIfMissing }}
+  rabbitmq:
+    url: "{{ .RabbitmqUrl }}"
+    queue: "{{ .Namespace }}-clusters-{{ .AdapterName }}"
+    exchange: "{{ .Namespace }}-clusters"
+    routingKey: "{{ .AdapterName }}"
+
+image:
+  registry: "{{ .ImageRegistry }}"
+  repository: "{{ .AdapterImageRepo }}"
+  pullPolicy: "{{ .ImagePullPolicy }}"
+  tag: "{{ .AdapterImageTag }}"
+
+labels:
+  e2e.hyperfleet.io/run-id: "{{ .RunId }}"
+
+env:
+  - name: RUN_ID
+    value: "{{ .RunId }}"

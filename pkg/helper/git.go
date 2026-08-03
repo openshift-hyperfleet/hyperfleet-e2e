@@ -7,78 +7,85 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/logger"
+)
+
+var (
+	APIGitClone     *GitCloneChart
+	AdapterGitClone *GitCloneChart
 )
 
 // HelmChartCloneOptions contains configuration for cloning a Helm chart repository
 type HelmChartCloneOptions struct {
 	// Component is the component name (e.g., "adapter", "api", "sentinel")
 	Component string
-
 	// RepoURL is the Git repository URL
 	RepoURL string
-
 	// Ref is the branch or tag to clone
 	// Note: Commit SHAs are not supported due to git clone --branch limitations
 	Ref string
-
 	// ChartPath is the path within the repository to the chart directory
 	// This will be used for sparse checkout to minimize download size
-	ChartPath string
-
+	RepoPath string
 	// WorkDir is the base work directory for cloning
 	// If empty, uses "./test-work" in current directory
 	WorkDir string
 }
 
+func NewGitClone(HelmChartCloneOptions *HelmChartCloneOptions) *GitCloneChart {
+	return &GitCloneChart{
+		chartOptions: HelmChartCloneOptions,
+	}
+}
+
+type GitCloneChart struct {
+	chartOptions *HelmChartCloneOptions
+	cloneOnce    sync.Once
+	clonedPath   string
+	err          error
+}
+
+func (g *GitCloneChart) CloneChartOnce(ctx context.Context) (string, error) {
+	g.cloneOnce.Do(func() {
+		g.clonedPath, g.err = CloneHelmChart(ctx, *g.chartOptions)
+	})
+	return g.clonedPath, g.err
+}
+
 // CloneHelmChart clones a Helm chart repository using sparse checkout to minimize download size.
-// It returns the full path to the cloned chart and a cleanup function.
-func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions) (chartPath string, cleanup func() error, err error) {
-	// Validate required fields
+// It returns the full path to the cloned chart directory.
+func CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions) (string, error) {
 	if opts.Component == "" {
-		return "", nil, fmt.Errorf("component is required")
+		return "", fmt.Errorf("component is required")
 	}
 	if opts.RepoURL == "" {
-		return "", nil, fmt.Errorf("repoURL is required")
+		return "", fmt.Errorf("repoURL is required")
 	}
 	if opts.Ref == "" {
-		return "", nil, fmt.Errorf("ref is required")
+		return "", fmt.Errorf("ref is required")
 	}
-	if opts.ChartPath == "" {
-		return "", nil, fmt.Errorf("ChartPath is required")
+	if opts.RepoPath == "" {
+		return "", fmt.Errorf("ChartPath is required")
 	}
 
-	// Set default work directory if not specified
 	workDir := opts.WorkDir
 	if workDir == "" {
-		// Default to ./.test-work in current directory
 		cwd, err := os.Getwd()
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to get current directory: %w", err)
+			return "", fmt.Errorf("failed to get current directory: %w", err)
 		}
 		workDir = filepath.Join(cwd, TestWorkDir)
 	}
 
-	// Ensure work directory exists before cloning
 	if err := os.MkdirAll(workDir, 0750); err != nil {
-		return "", nil, fmt.Errorf("failed to create work directory: %w", err)
+		return "", fmt.Errorf("failed to create work directory: %w", err)
 	}
 
-	// Create an isolated component-specific directory per invocation
-	// This prevents race conditions when parallel tests clone the same component
 	componentDir, err := os.MkdirTemp(workDir, opts.Component+"-")
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to create component work directory: %w", err)
-	}
-
-	// Cleanup function to remove the cloned repository
-	cleanup = func() error {
-		logger.Info("cleaning up cloned Helm chart", "path", componentDir)
-		if err := os.RemoveAll(componentDir); err != nil {
-			return fmt.Errorf("failed to remove cloned chart directory: %w", err)
-		}
-		return nil
+		return "", fmt.Errorf("failed to create component work directory: %w", err)
 	}
 
 	// Redact credentials from RepoURL before logging
@@ -92,7 +99,7 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 		"component", opts.Component,
 		"repo", redactedRepo,
 		"ref", opts.Ref,
-		"chart_path", opts.ChartPath,
+		"repo_path", opts.RepoPath,
 		"dest", componentDir)
 
 	// Step 1: Clone with sparse checkout (no files yet)
@@ -107,49 +114,45 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 		componentDir)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
-		return "", nil, fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
+		_ = os.RemoveAll(componentDir)
+		return "", fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
 	}
 
 	// Step 2: Configure sparse checkout - only checkout the chart path
-	logger.Info("configuring sparse checkout", "sparse_path", opts.ChartPath)
+	logger.Info("configuring sparse checkout", "sparse_path", opts.RepoPath)
 
-	// Initialize sparse checkout (no cone mode)
 	cmd = exec.CommandContext(ctx, "git", "sparse-checkout", "init", "--no-cone")
 	cmd.Dir = componentDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
-		return "", nil, fmt.Errorf("sparse-checkout init failed: %w\nOutput: %s", err, string(output))
+		_ = os.RemoveAll(componentDir)
+		return "", fmt.Errorf("sparse-checkout init failed: %w\nOutput: %s", err, string(output))
 	}
 
-	// Set sparse checkout path
-	cmd = exec.CommandContext(ctx, "git", "sparse-checkout", "set", opts.ChartPath) // #nosec G204 -- opts.ChartPath is from trusted config
+	cmd = exec.CommandContext(ctx, "git", "sparse-checkout", "set", opts.RepoPath) // #nosec G204 -- opts.ChartPath is from trusted config
 	cmd.Dir = componentDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
-		return "", nil, fmt.Errorf("sparse-checkout set failed: %w\nOutput: %s", err, string(output))
+		_ = os.RemoveAll(componentDir)
+		return "", fmt.Errorf("sparse-checkout set failed: %w\nOutput: %s", err, string(output))
 	}
 
-	// Checkout the files
 	logger.Info("checking out files")
 	cmd = exec.CommandContext(ctx, "git", "checkout", opts.Ref) // #nosec G204 -- opts.Ref is from trusted config
 	cmd.Dir = componentDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
-		return "", nil, fmt.Errorf("git checkout failed: %w\nOutput: %s", err, string(output))
+		_ = os.RemoveAll(componentDir)
+		return "", fmt.Errorf("git checkout failed: %w\nOutput: %s", err, string(output))
 	}
 
-	// Verify Chart.yaml exists in the cloned chart directory
-	fullChartPath := filepath.Join(componentDir, opts.ChartPath)
+	fullChartPath := filepath.Join(componentDir, opts.RepoPath)
 	chartYamlPath := filepath.Join(fullChartPath, "Chart.yaml")
 	if _, err := os.Stat(chartYamlPath); err != nil {
-		_ = cleanup()
-		return "", nil, fmt.Errorf("chart.yaml not found at %s (verify ChartPath is correct): %w", fullChartPath, err)
+		_ = os.RemoveAll(componentDir)
+		return "", fmt.Errorf("chart.yaml not found at %s (verify ChartPath is correct): %w", fullChartPath, err)
 	}
 
 	logger.Info("Helm chart cloned successfully",
 		"component", opts.Component,
 		"chart_path", fullChartPath)
 
-	return fullChartPath, cleanup, nil
+	return fullChartPath, nil
 }
