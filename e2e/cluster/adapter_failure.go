@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				err := h.InstallAdapter(ctx, deployOpts)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter: %v\n", err)
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", deployOpts.AdapterName, err)
 					}
 				})
 				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")

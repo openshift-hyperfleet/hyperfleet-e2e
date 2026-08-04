@@ -28,8 +28,6 @@ type AdapterDeploymentOptions struct {
 	ReleaseName  string
 	ChartPath    string
 	AdapterName  string
-	Timeout      time.Duration
-	SetValues    map[string]string // Additional Helm --set values
 	ResourceType string
 }
 
@@ -176,10 +174,10 @@ func parseTemplateWithValues(data map[string]interface{}, baseTemplateFilePath s
 	// Unmarshal the base values filepath into the values map
 	adapterConfig, err := os.ReadFile(filepath.Clean(baseValuesFilePath))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read adapterConfig.yaml: %w", err)
+		return nil, fmt.Errorf("failed to read %s: %w", baseValuesFilePath, err)
 	}
 	if err := yaml.Unmarshal(adapterConfig, &values); err != nil {
-		return nil, fmt.Errorf("failed to parse adapterConfig.yaml: %w", err)
+		return nil, fmt.Errorf("failed to parse %s: %w", baseValuesFilePath, err)
 	}
 
 	return values, nil
