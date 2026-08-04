@@ -1,28 +1,28 @@
 broker:
-  type: "{{ .BrokerType }}"
+  type: {{ .BrokerType | quote }}
   create: true
   googlepubsub:
-    projectId: "{{ .ProjectId }}"
-    subscriptionId: "{{ .Namespace }}-clusters-{{ .AdapterName }}"
-    topic: "{{ .Namespace }}-clusters"
-    deadLetterTopic: "{{ .Namespace }}-clusters-dlq"
+    projectId: {{ .ProjectId | quote }}
+    subscriptionId: {{ .Namespace }}-clusters-{{ .AdapterName | quote }}
+    topic: {{ .Namespace }}-clusters | quote }}
+    deadLetterTopic: {{ .Namespace }}-clusters-dlq | quote }}
     createTopicIfMissing: {{ .AdapterGooglepubsubCreateTopicIfMissing }}
     createSubscriptionIfMissing: {{ .AdapterGooglepubsubCreateSubscriptionIfMissing }}
   rabbitmq:
-    url: "{{ .RabbitmqUrl }}"
-    queue: "{{ .Namespace }}-clusters-{{ .AdapterName }}"
-    exchange: "{{ .Namespace }}-clusters"
-    routingKey: "{{ .AdapterName }}"
+    url: {{ .RabbitmqUrl | quote }}
+    queue: {{ .Namespace }}-clusters-{{ .AdapterName | quote }}
+    exchange: {{ .Namespace }}-clusters | quote }}
+    routingKey: {{ .AdapterName | quote }}
 
 image:
-  registry: "{{ .ImageRegistry }}"
-  repository: "{{ .AdapterImageRepo }}"
-  pullPolicy: "{{ .ImagePullPolicy }}"
-  tag: "{{ .AdapterImageTag }}"
+  registry: {{ .ImageRegistry | quote }}
+  repository: {{ .AdapterImageRepo | quote }}
+  pullPolicy: {{ .ImagePullPolicy | quote }}
+  tag: {{ .AdapterImageTag | quote }}
 
 labels:
-  e2e.hyperfleet.io/run-id: "{{ .RunId }}"
+  e2e.hyperfleet.io/run-id: {{ .RunId | quote }}
 
 env:
   - name: RUN_ID
-    value: "{{ .RunId }}"
+    value: {{ .RunId | quote }}
