@@ -15,13 +15,13 @@ broker:
     routingKey: {{ .AdapterName | quote }}
 
 image:
-  registry: {{ .ImageRegistry | quote }}
-  repository: {{ .AdapterImageRepo | quote }}
-  pullPolicy: {{ .ImagePullPolicy | quote }}
+  registry: {{ .ImageRegistry  | quote }}
+  repository: {{ .AdapterImageRepo | quote}}
+  pullPolicy: {{ .ImagePullPolicy }}
   tag: {{ .AdapterImageTag | quote }}
 
 labels:
-  e2e.hyperfleet.io/run-id: {{ .RunId | quote }}
+  e2e.hyperfleet.io/run-id: {{ .RunId | quote}}
 
 env:
   - name: RUN_ID

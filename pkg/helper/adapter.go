@@ -118,6 +118,7 @@ func (h *Helper) InstallAdapter(ctx context.Context, opts AdapterDeploymentOptio
 		"e2e.hyperfleet.io/run-id": h.Cfg.RunID,
 	}
 
+	logger.Info("Release Values", releaseValues)
 	helmClient := helm.NewHelmClient(h.Cfg.Namespace)
 	if err := helmClient.InstallRelease(ctx, opts.ReleaseName, opts.ChartPath, releaseValues, labels); err != nil {
 		return fmt.Errorf("failed to install adapter %s (release %s): %w", opts.AdapterName, opts.ReleaseName, err)
