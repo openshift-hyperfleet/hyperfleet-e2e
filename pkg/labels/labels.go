@@ -32,3 +32,7 @@ const (
 	Disruptive = "disruptive" // Destructive testing: fault injection
 	Slow       = "slow"       // Long-running: execution time exceeds 5-10 minutes
 )
+
+const (
+	Adapter = "adapter"
+)

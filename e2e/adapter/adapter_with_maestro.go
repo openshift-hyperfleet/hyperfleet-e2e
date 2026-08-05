@@ -3,7 +3,6 @@ package adapter
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -424,104 +423,51 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport] Adapter Framework -
 )
 
 var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter Framework - Maestro Transport Negative Scenarios",
-	ginkgo.Label(labels.Tier1),
+	ginkgo.Label(labels.Tier1, labels.Adapter),
 	func() {
 		var (
 			h              *helper.Helper
-			clusterID      string
-			adapterRelease string // Track deployed adapter release name for cleanup
-			adapterName    string // Track deployed adapter name for cleanup
-			chartPath      string
 			baseDeployOpts helper.AdapterDeploymentOptions
 		)
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
-			adapterRelease = ""
-			clusterID = ""
-			adapterName = ""
-
-			// Clone adapter Helm chart repository (shared across negative tests)
-			ginkgo.By("Clone adapter Helm chart repository for negative tests")
-			var cleanupChart func() error
-			var err error
-			chartPath, cleanupChart, err = h.CloneHelmChart(ctx, helper.HelmChartCloneOptions{
-				Component: "adapter",
-				RepoURL:   h.Cfg.AdapterDeployment.ChartRepo,
-				Ref:       h.Cfg.AdapterDeployment.ChartRef,
-				ChartPath: h.Cfg.AdapterDeployment.ChartPath,
-				WorkDir:   helper.TestWorkDir,
-			})
+			// Clone Adapter Chart
+			path, err := helper.AdapterGitClone.CloneChartOnce(ctx)
 			Expect(err).NotTo(HaveOccurred(), "failed to clone adapter Helm chart")
-			ginkgo.GinkgoWriter.Printf("Cloned adapter chart to: %s\n", chartPath)
+			ginkgo.GinkgoWriter.Printf("Cloned adapter chart to: %s\n", path)
 
 			// Set up base deployment options with common fields
 			baseDeployOpts = helper.AdapterDeploymentOptions{
-				Namespace:    h.Cfg.Namespace,
-				ChartPath:    chartPath,
+				ChartPath:    path,
 				ResourceType: helper.ResourceTypeClusters,
 			}
-			// Ensure chart cleanup after test
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				ginkgo.By("Cleanup cloned Helm chart")
-				if err := cleanupChart(); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup chart: %v\n", err)
-				}
-			})
-
-			// Register adapter and cluster cleanup (vars captured by reference; values set in each It)
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if adapterRelease != "" {
-					ginkgo.By("Uninstall adapter " + adapterRelease)
-					if err := h.UninstallAdapter(ctx, adapterRelease, h.Cfg.Namespace); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", adapterRelease, err)
-					}
-				}
-				if clusterID != "" {
-					ginkgo.By("Cleanup test cluster " + clusterID)
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
-					}
-				}
-				if adapterName != "" {
-					if h.Cfg.BrokerType == "googlepubsub" {
-						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, adapterName, baseDeployOpts.ResourceType); err != nil {
-							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
-						}
-					}
-				}
-			})
 		})
 
 		ginkgo.It("should fail when targeting unregistered Maestro consumer and report appropriate error",
 			func(ctx context.Context) {
 				// Test-specific adapter configuration
-				adapterName = "cl-m-unreg-consumer"
-				err := os.Setenv("ADAPTER_NAME", adapterName)
-				Expect(err).NotTo(HaveOccurred(), "failed to set ADAPTER_NAME environment variable")
-				ginkgo.DeferCleanup(func() {
-					_ = os.Unsetenv("ADAPTER_NAME")
-				})
+				adapterName := "cl-m-unreg-consumer"
 				// Generate unique release name for this deployment
 				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
 
-				// Deploy the test adapter configured to target unregistered consumer
+				// Purge even queue before deploying test adapter
 				ginkgo.By("Purge adapter event queue to start from a clean state")
 				if err := h.PurgeAdapterQueue(ctx, adapterName); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to purge queue for %s: %v\n", adapterName, err)
 				}
 
 				ginkgo.By("Deploy test adapter with unregistered consumer configuration")
-
-				// Create deployment options from base and add test-specific fields
 				deployOpts := baseDeployOpts
 				deployOpts.ReleaseName = releaseName
 				deployOpts.AdapterName = adapterName
 
-				// Set adapterRelease BEFORE deployment so cleanup will run even if deployment fails
-				adapterRelease = releaseName
-				err = h.DeployAdapter(ctx, deployOpts)
+				err := h.InstallAdapter(ctx, deployOpts)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", deployOpts.AdapterName, err)
+					}
+				})
 				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")
 				ginkgo.GinkgoWriter.Printf("Successfully deployed adapter: %s (release: %s)\n", adapterName, releaseName)
 
@@ -531,7 +477,13 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
 				Expect(cluster.Name).NotTo(BeEmpty(), "cluster name should be present")
-				clusterID = *cluster.Id
+				clusterID := *cluster.Id
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("Cleanup test cluster " + clusterID)
+					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					}
+				})
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				ginkgo.By("Verify adapter reports failure for unregistered consumer")
@@ -643,15 +595,10 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 		ginkgo.It("should fail to discover ManifestWork when discovery name does not match created resource",
 			func(ctx context.Context) {
 				// Test-specific adapter configuration
-				adapterName = "cl-m-wrong-ds"
-				// Set environment variable for envsubst expansion in values.yaml
-				err := os.Setenv("ADAPTER_NAME", adapterName)
-				Expect(err).NotTo(HaveOccurred(), "failed to set ADAPTER_NAME environment variable")
-				ginkgo.DeferCleanup(func() {
-					_ = os.Unsetenv("ADAPTER_NAME")
-				})
+				adapterName := "cl-m-wrong-ds"
 				// Generate unique release name for this deployment
 				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
+
 				// Deploy the test adapter with wrong main discovery configuration
 				ginkgo.By("Purge adapter event queue to start from a clean state")
 				if err := h.PurgeAdapterQueue(ctx, adapterName); err != nil {
@@ -660,14 +607,16 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 				ginkgo.By("Deploy test adapter with wrong ManifestWork discovery name")
 
-				// Create deployment options from base and add test-specific fields
 				deployOpts := baseDeployOpts
 				deployOpts.ReleaseName = releaseName
 				deployOpts.AdapterName = adapterName
 
-				// Set adapterRelease BEFORE deployment so cleanup will run even if deployment fails
-				adapterRelease = releaseName
-				err = h.DeployAdapter(ctx, deployOpts)
+				err := h.InstallAdapter(ctx, deployOpts)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", deployOpts.AdapterName, err)
+					}
+				})
 				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")
 				ginkgo.GinkgoWriter.Printf("Successfully deployed adapter: %s (release: %s)\n", adapterName, releaseName)
 
@@ -677,7 +626,13 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
 				Expect(cluster.Name).NotTo(BeEmpty(), "cluster name should be present")
-				clusterID = *cluster.Id
+				clusterID := *cluster.Id
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("Cleanup test cluster " + clusterID)
+					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					}
+				})
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				// Verify ManifestWork was created by the test adapter despite wrong discovery config
@@ -829,15 +784,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 		ginkgo.It("should fail nested discovery when resource names are wrong",
 			func(ctx context.Context) {
-				// Test-specific adapter configuration
-				adapterName = "cl-m-wrong-nest"
-				// Set environment variable for envsubst expansion in values.yaml
-				err := os.Setenv("ADAPTER_NAME", adapterName)
-				Expect(err).NotTo(HaveOccurred(), "failed to set ADAPTER_NAME environment variable")
-				ginkgo.DeferCleanup(func() {
-					_ = os.Unsetenv("ADAPTER_NAME")
-				})
-
+				adapterName := "cl-m-wrong-nest"
 				// Generate unique release name for this deployment
 				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
 
@@ -854,10 +801,12 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 				deployOpts.ReleaseName = releaseName
 				deployOpts.AdapterName = adapterName
 
-				// Set adapterRelease BEFORE deployment so cleanup will run even if deployment fails
-				adapterRelease = releaseName
-
-				err = h.DeployAdapter(ctx, deployOpts)
+				err := h.InstallAdapter(ctx, deployOpts)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", deployOpts.AdapterName, err)
+					}
+				})
 				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")
 				ginkgo.GinkgoWriter.Printf("Successfully deployed adapter: %s (release: %s)\n", adapterName, releaseName)
 
@@ -867,7 +816,13 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
 				Expect(cluster.Name).NotTo(BeEmpty(), "cluster name should be present")
-				clusterID = *cluster.Id
+				clusterID := *cluster.Id
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("Cleanup test cluster " + clusterID)
+					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					}
+				})
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				// Construct namespace name AFTER cluster is created
@@ -996,14 +951,7 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 		ginkgo.It("should fail post-action when status API is unreachable",
 			func(ctx context.Context) {
 				// Use cl-m-bad-api adapter with overridden API URL
-				adapterName = "cl-m-bad-api"
-				// Set environment variable for envsubst expansion in values.yaml
-				err := os.Setenv("ADAPTER_NAME", adapterName)
-				Expect(err).NotTo(HaveOccurred(), "failed to set ADAPTER_NAME environment variable")
-				ginkgo.DeferCleanup(func() {
-					_ = os.Unsetenv("ADAPTER_NAME")
-				})
-
+				adapterName := "cl-m-bad-api"
 				// Generate unique release name for this deployment
 				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
 
@@ -1015,17 +963,16 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 
 				ginkgo.By("Deploy test adapter with unreachable API URL configuration")
 
-				// Create deployment options with overridden API URL
 				deployOpts := baseDeployOpts
 				deployOpts.ReleaseName = releaseName
 				deployOpts.AdapterName = adapterName
-				// Override hyperfleetApi.baseUrl to make it unreachable
-				deployOpts.SetValues = map[string]string{
-					"adapterConfig.hyperfleetApi.baseUrl": "http://invalid-hyperfleet-api-endpoint.local:9999",
-				}
 
-				adapterRelease = releaseName
-				err = h.DeployAdapter(ctx, deployOpts)
+				err := h.InstallAdapter(ctx, deployOpts)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					if err := h.UninstallAdapter(ctx, deployOpts); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", deployOpts.AdapterName, err)
+					}
+				})
 				Expect(err).NotTo(HaveOccurred(), "failed to deploy test adapter")
 				ginkgo.GinkgoWriter.Printf("Successfully deployed adapter: %s (release: %s)\n", adapterName, releaseName)
 
@@ -1035,7 +982,13 @@ var _ = ginkgo.Describe("[Suite: adapter][maestro-transport][negative] Adapter F
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
 				Expect(cluster.Name).NotTo(BeEmpty(), "cluster name should be present")
-				clusterID = *cluster.Id
+				clusterID := *cluster.Id
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("Cleanup test cluster " + clusterID)
+					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					}
+				})
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				// Construct namespace name AFTER cluster is created

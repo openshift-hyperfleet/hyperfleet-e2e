@@ -3,36 +3,37 @@ package helm
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"sync"
 	"time"
 
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/logger"
 )
 
-// Client wraps Helm SDK functionality
-type Client struct {
+// HelmClient wraps Helm SDK functionality for E2E test cleanup operations
+type HelmClient struct {
 	settings     *cli.EnvSettings
-	namespace    string
 	actionConfig *action.Configuration
 	configOnce   sync.Once
 	configErr    error
 }
 
-// NewClient creates a new Helm client using default environment settings
-func NewClient(namespace string) *Client {
-	return &Client{
-		settings:  cli.New(),
-		namespace: namespace,
+// NewHelmClient creates a new Helm client using default environment settings
+func NewHelmClient(namespace string) *HelmClient {
+	envSettings := cli.New()
+	envSettings.SetNamespace(namespace)
+
+	return &HelmClient{
+		settings: envSettings,
 	}
 }
 
 // initActionConfig initializes Helm action configuration once and caches it
 // Subsequent calls return the cached config
-func (c *Client) initActionConfig() (*action.Configuration, error) {
+func (c *HelmClient) initActionConfig() (*action.Configuration, error) {
 	c.configOnce.Do(func() {
 		actionConfig := new(action.Configuration)
 
@@ -40,7 +41,7 @@ func (c *Client) initActionConfig() (*action.Configuration, error) {
 		helmDriver := ""
 
 		// Initialize with REST client getter, namespace, and driver
-		if err := actionConfig.Init(c.settings.RESTClientGetter(), c.namespace, helmDriver, func(format string, v ...interface{}) {
+		if err := actionConfig.Init(c.settings.RESTClientGetter(), c.settings.Namespace(), helmDriver, func(format string, v ...interface{}) {
 			logger.Info(fmt.Sprintf(format, v...))
 		}); err != nil {
 			c.configErr = fmt.Errorf("failed to init Helm action config: %w", err)
@@ -48,7 +49,7 @@ func (c *Client) initActionConfig() (*action.Configuration, error) {
 		}
 
 		c.actionConfig = actionConfig
-		logger.Info("initialized Helm action config", "namespace", c.namespace)
+		logger.Info("initialized Helm action config", "namespace", c.settings.Namespace())
 	})
 
 	return c.actionConfig, c.configErr
@@ -57,7 +58,7 @@ func (c *Client) initActionConfig() (*action.Configuration, error) {
 // ListReleases lists all Helm releases across client namespace with the given label selector
 // labelSelector uses Kubernetes label selector format (e.g., "e2e.hyperfleet.io/run-id=test-123")
 // Returns a list of release names
-func (c *Client) ListReleasesBySelector(labelSelector string) ([]string, error) {
+func (c *HelmClient) ListReleasesBySelector(labelSelector string) ([]string, error) {
 	// Initialize action config for all namespaces (empty string means all)
 	actionConfig, err := c.initActionConfig()
 	if err != nil {
@@ -78,7 +79,7 @@ func (c *Client) ListReleasesBySelector(labelSelector string) ([]string, error) 
 	releases := []string{}
 	for _, rel := range results {
 		// check that helm list is only listing releases in namespace
-		if rel.Namespace != c.namespace {
+		if rel.Namespace != c.settings.Namespace() {
 			logger.Warn("helm incorrectly listing releases outside namespace")
 			continue
 		}
@@ -89,29 +90,65 @@ func (c *Client) ListReleasesBySelector(labelSelector string) ([]string, error) 
 	return releases, nil
 }
 
-// UninstallRelease uninstalls the helm release. This workflow matches the way the adapters are currently installed.
-// Future work can be done to move helm releases to be installed with helm sdk
-func (c *Client) UninstallRelease(ctx context.Context, releaseName, namespace string) error {
-	logger.Info("uninstalling helm release",
-		"release_name", releaseName,
-		"namespace", namespace)
-
-	// Create context with timeout
-	cmdCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	// Execute Helm uninstall command
-	cmd := exec.CommandContext(cmdCtx, "helm", "uninstall", releaseName,
-		"-n", namespace,
-		"--wait",
-		"--timeout", "5m")
-
-	output, err := cmd.CombinedOutput()
-
+// InstallRelease installs a Helm chart from a local path with values from a template file
+// fileValues is a slice of "key=filepath" entries that will be loaded and set as values (like --set-file)
+func (c *HelmClient) InstallRelease(ctx context.Context, releaseName string, chartPath string, releaseValues map[string]interface{},
+	labels map[string]string) error {
+	actionConfig, err := c.initActionConfig()
 	if err != nil {
-		return fmt.Errorf("failed to uninstall release: %w (output: %s)", err, string(output))
+		return err
 	}
 
-	logger.Info("helm uninstall completed", "release", releaseName, "namespace", namespace)
+	// Set up install action
+	installClient := action.NewInstall(actionConfig)
+	installClient.DryRunOption = "none"
+	installClient.ReleaseName = releaseName
+	installClient.Namespace = c.settings.Namespace()
+	installClient.CreateNamespace = true
+	installClient.Wait = true
+	installClient.Timeout = 5 * time.Minute
+	installClient.Labels = labels
+
+	// Load the chart from local filesystem
+	chart, err := loader.Load(chartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load chart from %s: %w", chartPath, err)
+	}
+
+	// Install the chart with dedicated releaseValues
+	release, err := installClient.RunWithContext(ctx, chart, releaseValues)
+	if err != nil {
+		return fmt.Errorf("failed to install release: %w", err)
+	}
+
+	logger.Info("successfully installed release",
+		"name", release.Name,
+		"version", release.Version,
+		"namespace", release.Namespace)
+
+	return nil
+}
+
+// UninstallRelease uninstalls the helm release. This workflow matches the way the adapters are currently installed.
+// Future work can be done to move helm releases to be installed with helm sdk
+func (c *HelmClient) UninstallRelease(releaseName string) error {
+	actionConfig, err := c.initActionConfig()
+	if err != nil {
+		return err
+	}
+
+	uninstallClient := action.NewUninstall(actionConfig)
+	uninstallClient.DeletionPropagation = "foreground" // "background" or "orphan"
+
+	result, err := uninstallClient.Run(releaseName)
+	if err != nil {
+		return fmt.Errorf("failed to run uninstall action: %w", err)
+	}
+	if result != nil && result.Release != nil {
+		logger.Info("helm uninstall completed",
+			"name", result.Release.Name,
+			"version", result.Release.Version,
+			"namespace", result.Release.Namespace)
+	}
 	return nil
 }

@@ -66,6 +66,25 @@ var _ = ginkgo.BeforeSuite(func(ctx ginkgo.SpecContext) {
 	adapterDeploymentList := helper.InitAdapterDeploymentList()
 	helper.SetAdapterDeploymentList(adapterDeploymentList)
 
+	// Initialize adapter and api clones - setup no actual cloning happens
+
+	// Initialize the gitClone for the adapter chart
+	helper.AdapterGitClone = helper.NewGitClone(&helper.HelmChartCloneOptions{
+		Component: "adapter",
+		RepoURL:   cfg.AdapterDeployment.ChartRepo,
+		Ref:       cfg.AdapterDeployment.ChartRef,
+		RepoPath:  cfg.AdapterDeployment.ChartPath,
+		WorkDir:   ".test-work",
+	})
+	// Initialize the gitClone for the api chart
+	helper.APIGitClone = helper.NewGitClone(&helper.HelmChartCloneOptions{
+		Component: "api",
+		RepoURL:   cfg.APIDeployment.ChartRepo,
+		Ref:       cfg.APIDeployment.ChartRef,
+		RepoPath:  cfg.APIDeployment.ChartPath,
+		WorkDir:   ".test-work",
+	})
+
 	logger.Info("starting hyperfleet-e2e test suite - each test creates temporary resources")
 })
 
