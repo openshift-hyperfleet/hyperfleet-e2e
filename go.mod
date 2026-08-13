@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	cloud.google.com/go/pubsub/v2 v2.6.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2

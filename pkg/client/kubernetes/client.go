@@ -373,6 +373,31 @@ func HasDeploymentCondition(deploy *appsv1.Deployment, condType appsv1.Deploymen
 	return false
 }
 
+// EnsureServiceAccount creates a ServiceAccount if it doesn't already exist.
+// Idempotent: an existing ServiceAccount is treated as success.
+func (c *Client) EnsureServiceAccount(ctx context.Context, namespace, name string) error {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	_, err := c.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create service account %s/%s: %w", namespace, name, err)
+	}
+	return nil
+}
+
+// DeleteServiceAccount deletes a ServiceAccount. A missing ServiceAccount is treated as success.
+func (c *Client) DeleteServiceAccount(ctx context.Context, namespace, name string) error {
+	err := c.CoreV1().ServiceAccounts(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete service account %s/%s: %w", namespace, name, err)
+	}
+	return nil
+}
+
 // CreateToken requests a token for a service account using the TokenRequest API
 func (c *Client) CreateToken(ctx context.Context, namespace, serviceAccountName, audience string, expirationSeconds int64) (string, error) {
 	tokenRequest := &authenticationv1.TokenRequest{

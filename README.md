@@ -66,19 +66,21 @@ hyperfleet-e2e/
 ├── cmd/              - CLI entry point
 │   └── hyperfleet-e2e/
 ├── pkg/              - Core packages
-│   ├── api/          - OpenAPI generated client
-│   ├── client/       - HyperFleet API client wrapper
+│   ├── client/       - HyperFleet API client
 │   ├── config/       - Configuration loading and validation
 │   ├── e2e/          - Test execution engine (Ginkgo)
 │   ├── helper/       - Test helper utilities
 │   ├── labels/       - Test label definitions
-│   └── logger/       - Structured logging (slog)
+│   ├── logger/       - Structured logging (slog)
+│   └── util/         - Shared utility functions
 ├── e2e/              - Test suites
 │   ├── adapter/      - Adapter lifecycle tests
+│   ├── auth/         - JWT authentication tests
 │   ├── channel/      - Channel management tests
 │   ├── cluster/      - Cluster lifecycle tests
 │   ├── nodepool/     - NodePool management tests
-│   └── version/      - Version management tests
+│   ├── version/      - Version management tests
+│   └── wifconfig/    - WIF config management tests
 ├── testdata/         - Test payloads and fixtures
 │   ├── adapter-configs/ - Adapter configuration files
 │   └── payloads/
@@ -94,7 +96,6 @@ hyperfleet-e2e/
 ├── env/              - Environment configuration files
 ├── hack/             - Build and development scripts
 ├── images/           - Container image definitions
-├── openapi/          - OpenAPI spec and generation config
 └── scripts/          - Utility scripts
 ```
 

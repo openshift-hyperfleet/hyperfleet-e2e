@@ -26,6 +26,7 @@ const (
 const (
 	Upgrade = "upgrade" // Version compatibility: smooth upgrades
 	Adapter = "adapter" // Adapter: specific adapter tests that install and uninstall the adapter chart
+	Auth    = "auth"    // Authentication: JWT auth validation
 )
 
 // Constraint labels - Execution constraint dimension: determines scheduling strategy

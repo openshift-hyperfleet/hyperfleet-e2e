@@ -39,7 +39,7 @@ The environment guide covers:
 ### Build the E2E Binary
 
 ```bash
-# Generate API client from OpenAPI spec and build
+# Build the E2E binary
 make build
 
 # Verify the build

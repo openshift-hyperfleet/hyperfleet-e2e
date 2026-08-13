@@ -187,6 +187,30 @@ func (h *Helper) ScaleDeploymentBySelector(ctx context.Context, namespace, selec
 	return nil
 }
 
+// EnsureServiceAccount creates a ServiceAccount if it doesn't already exist.
+func (h *Helper) EnsureServiceAccount(ctx context.Context, namespace, name string) error {
+	logger.Info("ensuring service account exists", "namespace", namespace, "name", name)
+
+	if err := h.K8sClient.EnsureServiceAccount(ctx, namespace, name); err != nil {
+		return fmt.Errorf("ensure service account %s/%s: %w", namespace, name, err)
+	}
+
+	logger.Info("service account ensured", "namespace", namespace, "name", name)
+	return nil
+}
+
+// DeleteServiceAccount deletes a ServiceAccount.
+func (h *Helper) DeleteServiceAccount(ctx context.Context, namespace, name string) error {
+	logger.Info("deleting service account", "namespace", namespace, "name", name)
+
+	if err := h.K8sClient.DeleteServiceAccount(ctx, namespace, name); err != nil {
+		return fmt.Errorf("delete service account %s/%s: %w", namespace, name, err)
+	}
+
+	logger.Info("service account deleted", "namespace", namespace, "name", name)
+	return nil
+}
+
 // GetDeploymentName finds the deployment name for a Helm release by listing deployments with the release label.
 func (h *Helper) GetDeploymentName(ctx context.Context, namespace, releaseName string) (string, error) {
 	deployments, err := h.K8sClient.FetchDeploymentsByLabels(ctx, namespace, map[string]string{
