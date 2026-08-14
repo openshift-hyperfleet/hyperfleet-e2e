@@ -58,10 +58,8 @@ ENV HELM_CACHE_HOME=/tmp/helm-home/.cache/helm \
     HELM_PLUGINS=/usr/local/share/helm/plugins
 
 # Install Helm plugins
-ARG HELM_GIT_VERSION=v1.5.2
 ARG HELM_DIFF_VERSION=3.15.7
-RUN helm plugin install https://github.com/aslafy-z/helm-git --version ${HELM_GIT_VERSION} && \
-    helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
+RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
 
 ARG HELMFILE_VERSION=1.5.2
 # Install helmfile
