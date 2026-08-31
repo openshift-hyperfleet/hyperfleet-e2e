@@ -63,6 +63,9 @@ const (
 
 	// DefaultTokenRequestAudience is the default audience for TokenRequest tokens
 	DefaultTokenRequestAudience = "hyperfleet-api"
+
+	// DefaultHyperfleetAPIBaseURL is the in-cluster base URL for the HyperFleet API.
+	DefaultHyperfleetAPIBaseURL = "http://hyperfleet-gateway:8000"
 )
 
 // Default required adapters for resource types
