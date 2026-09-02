@@ -8,14 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	k8sclient "github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client/kubernetes"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 // hashSuffixPattern matches the deterministic hash appended on truncation:
@@ -109,89 +104,6 @@ func TestGenerateAdapterReleaseName_Deterministic(t *testing.T) {
 			b := GenerateAdapterReleaseName(tc.resourceType, tc.adapterName)
 			if a != b {
 				t.Errorf("non-deterministic output: %q != %q", a, b)
-			}
-		})
-	}
-}
-
-func newHelperWithService(ns string, svc *corev1.Service) *Helper {
-	var objs []k8sruntime.Object
-	if svc != nil {
-		objs = append(objs, svc)
-	}
-	return &Helper{
-		Cfg:       &config.Config{Namespace: ns},
-		K8sClient: &k8sclient.Client{Interface: fake.NewClientset(objs...)},
-	}
-}
-
-func TestResolveInternalAPIURL(t *testing.T) {
-	const ns = "hyperfleet-system"
-
-	svcWithPort := func(port int32) *corev1.Service {
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{Name: "hyperfleet-api", Namespace: ns},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{Port: port}},
-			},
-		}
-	}
-
-	tests := []struct {
-		name       string
-		svc        *corev1.Service
-		wantURL    string
-		wantErrMsg string
-	}{
-		{
-			name:    "service found with port",
-			svc:     svcWithPort(8000),
-			wantURL: fmt.Sprintf("http://hyperfleet-api.%s.svc.cluster.local:8000", ns),
-		},
-		{
-			name:       "service not found",
-			svc:        nil,
-			wantErrMsg: `failed to get hyperfleet-api service in namespace "hyperfleet-system"`,
-		},
-		{
-			name: "service found but no ports",
-			svc: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "hyperfleet-api", Namespace: ns},
-				Spec:       corev1.ServiceSpec{},
-			},
-			wantErrMsg: "hyperfleet-api service has no ports",
-		},
-		{
-			// A hyperfleet-api service in a different namespace must not be found
-			// when h.Cfg.Namespace is set — Get is scoped to the configured namespace.
-			name: "service in wrong namespace is not found",
-			svc: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "hyperfleet-api", Namespace: "other-ns"},
-				Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 8000}}},
-			},
-			wantErrMsg: `failed to get hyperfleet-api service in namespace "hyperfleet-system"`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newHelperWithService(ns, tt.svc)
-			got, err := h.resolveInternalAPIURL(context.Background())
-
-			if tt.wantErrMsg != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tt.wantErrMsg)
-				}
-				if !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("error %q does not contain %q", err.Error(), tt.wantErrMsg)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.wantURL {
-				t.Errorf("got %q, want %q", got, tt.wantURL)
 			}
 		})
 	}

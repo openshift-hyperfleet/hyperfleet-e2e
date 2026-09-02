@@ -16,6 +16,7 @@ import (
 
 	pubsubadmin "cloud.google.com/go/pubsub/v2/apiv1"
 	pubsubpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/logger"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -169,18 +170,14 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 		extraEnv = append(extraEnv, "ADAPTER_GOOGLEPUBSUB_CREATE_SUBSCRIPTION_IF_MISSING=true")
 	}
 
-	// Resolve the in-cluster HyperFleet API URL for adapters running inside Kubernetes.
-	// The external LoadBalancer IP (HYPERFLEET_API_URL) is not routable from within GKE pods.
-	// We look up the hyperfleet-api service across all namespaces and construct the FQDN so
-	// that adapters deployed to the test namespace can reach the API regardless of where it runs.
-	if os.Getenv("ADAPTER_HYPERFLEET_API_URL") == "" && h.K8sClient != nil {
-		if internalURL, err := h.resolveInternalAPIURL(ctx); err == nil && internalURL != "" {
-			extraEnv = append(extraEnv, "ADAPTER_HYPERFLEET_API_URL="+internalURL)
-			logger.Info("resolved in-cluster HyperFleet API URL for adapters", "url", internalURL)
-		} else {
-			logger.Info("could not resolve in-cluster API URL, falling back to HYPERFLEET_API_URL",
-				"error", err)
-		}
+	// Resolve the in-cluster API URL for adapters. This is intentionally separate from
+	// HYPERFLEET_API_URL, which points wherever the e2e test process itself reaches the API
+	// (e.g. a port-forward or external LB address) and is not routable from in-cluster pods.
+	// Adapters reach the API via the in-cluster hyperfleet-gateway Service, which lives in the
+	// same namespace adapters are deployed into.
+	apiURL := os.Getenv("ADAPTER_HYPERFLEET_API_URL")
+	if apiURL == "" {
+		apiURL = config.DefaultHyperfleetAPIBaseURL
 	}
 
 	// Expand environment variables in values.yaml in-place using envsubst
@@ -223,7 +220,11 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 		"-f", valuesFilePath,
 	}
 
-	// Append conditional --set flags
+	// Override chart's default hyperfleetApi.baseUrl with the resolved API URL via --set.
+	helmArgs = append(helmArgs, "--set", "adapterConfig.hyperfleetApi.baseUrl="+apiURL)
+
+	// Append conditional --set flags (opts.SetValues is applied last, so tests can still override
+	// the base URL, e.g. to simulate an unreachable API)
 	helmArgs = append(helmArgs, h.adapterHelmSetArgs(releaseName, opts)...)
 
 	logger.Info("executing Helm command", "args", helmArgs)
@@ -287,22 +288,6 @@ func (h *Helper) adapterHelmSetArgs(releaseName string, opts AdapterDeploymentOp
 	}
 
 	return args
-}
-
-// resolveInternalAPIURL looks up the hyperfleet-api Kubernetes service in the configured
-// namespace and returns an in-cluster FQDN URL that adapters deployed in any namespace can use.
-// This is needed because the external LoadBalancer IP is not routable from within GKE pods.
-func (h *Helper) resolveInternalAPIURL(ctx context.Context) (string, error) {
-	ns := h.Cfg.Namespace
-	svc, err := h.K8sClient.CoreV1().Services(ns).Get(ctx, "hyperfleet-api", metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get hyperfleet-api service in namespace %q: %w", ns, err)
-	}
-	if len(svc.Spec.Ports) == 0 {
-		return "", fmt.Errorf("hyperfleet-api service has no ports")
-	}
-	port := svc.Spec.Ports[0].Port
-	return fmt.Sprintf("http://hyperfleet-api.%s.svc.cluster.local:%d", ns, port), nil
 }
 
 // UninstallAdapter uninstalls an adapter using Helm uninstall
