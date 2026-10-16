@@ -224,8 +224,9 @@ The test cases you run locally are automatically picked up and executed in night
 | Job Name | Test Tier | Schedule | Description |
 |----------|-----------|----------|-------------|
 | **tier0-nightly** | tier0 | Daily | Critical: Core user journey broken, fix immediately, blocks release |
-| **tier1-nightly** | tier1 | Daily | Major: Important features affected, should be addressed |
+| **tier1-nightly** | tier1 && !perf | Daily | Major: Important features affected, should be addressed |
 | **tier2-nightly** | tier2 | Daily | Minor: Edge cases or low-frequency scenarios, can be deferred |
+| **perf-nightly** | perf | Daily | Performance specs (latency thresholds), isolated from functional tests |
 
 **Based on [`pkg/labels/labels.go`](../pkg/labels/labels.go) file tags**
 

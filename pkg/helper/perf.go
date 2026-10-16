@@ -22,8 +22,11 @@ const DefaultSamples = 5
 // MeasureMedianLatency calls sampleFn n times with its index, records each
 // call's duration, and asserts the median is below threshold.
 //
-// ASSUMPTION: the HTTP connection pool is already warm, since callers run
-// ginkgo.Serial after other specs have used it.
+// Callers are ginkgo.Serial, so no other spec runs while this one samples.
+// The HTTP connection pool may still be cold for the first sample: in
+// perf-nightly, process 1 may not have run a parallel spec before the Serial
+// ones. The median absorbs that one slow sample. Parallel callers would need a
+// per-process warmup in SynchronizedBeforeSuite.
 func MeasureMedianLatency(name string, threshold time.Duration, n int, sampleFn func(i int)) {
 	gomega.Expect(n).To(gomega.BeNumerically(">", 0), "MeasureMedianLatency: sample count must be positive, got %d", n)
 
