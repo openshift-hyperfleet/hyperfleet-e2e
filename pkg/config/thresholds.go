@@ -5,9 +5,14 @@ import "time"
 // Performance thresholds for API read operations.
 // All API reads share the same threshold since payload size
 // does not meaningfully impact latency at current scales.
+// In Prow, each sample also goes through the public LoadBalancer and the
+// gateway, so most of it is network time. Baselines are Prow medians from
+// tier1-nightly, 2026-09-16 to 2026-10-16 (see
+// hyperfleet/docs/performance-baselines.md in the architecture repo).
+// The read threshold is ~1.4x the baseline.
 const (
-	ThresholdAPIRead = 50 * time.Millisecond
-	ThresholdAPIList = 50 * time.Millisecond
+	ThresholdAPIRead = 50 * time.Millisecond // baseline ~36ms
+	ThresholdAPIList = 50 * time.Millisecond // baseline ~36ms
 )
 
 // Performance thresholds for reconciliation operations.
@@ -36,13 +41,18 @@ const (
 // Covers Channel, Version, and WifConfig create/update/delete. None of these kinds
 // carry RequiredAdapters, so writes complete synchronously with no reconciliation
 // to await — unlike Cluster/NodePool, there is no create/update-to-reconciled variant.
-// Calibrated from a GKE-dev baseline run (~1k seeded rows per kind, 2026-07-27);
-// observed latencies were 3-10ms across all three kinds, well under this shared
-// threshold — see hyperfleet/docs/performance-baselines.md in the architecture repo.
-// No Prow tier1-nightly baseline yet; recalibrate once 5+ clean nightly runs
-// are available now that these specs run Serial.
+//
+// These apply to root writes (Channel, WifConfig), with a ~1.5x margin over
+// the Prow baseline. The measurement is the same as for reads above.
 const (
-	ThresholdAPICreate = 50 * time.Millisecond
-	ThresholdAPIUpdate = 50 * time.Millisecond
-	ThresholdAPIDelete = 50 * time.Millisecond
+	ThresholdAPICreate = 60 * time.Millisecond // baseline ~38ms
+	ThresholdAPIUpdate = 60 * time.Millisecond // baseline ~38ms
+	ThresholdAPIDelete = 60 * time.Millisecond // baseline ~38ms
 )
+
+// Performance threshold for nested Version writes (/channels/{parent_id}/versions).
+// Before each write, the API also reads the parent Channel. On update and
+// delete, it also reads the Version (checkOwnership in hyperfleet-api).
+// 75ms is above the highest Prow median seen (74.3ms). Recalibrate after
+// HYPERFLEET-1766 removes the extra reads. HYPERFLEET-1734 replaces these specs.
+const ThresholdAPINestedWrite = 75 * time.Millisecond // baseline ~43ms

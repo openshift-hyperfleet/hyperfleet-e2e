@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: version][perf] Create latency",
 		})
 
 		ginkgo.It("should create a version within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /channels/{parent_id}/versions", config.ThresholdAPICreate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("POST /channels/{parent_id}/versions", config.ThresholdAPINestedWrite, helper.DefaultSamples,
 				func(int) {
 					// No per-version cleanup: the channel's DeferCleanup above sweeps all its versions.
 					version, err := h.Client.CreateVersionFromPayload(ctx, channelID, h.TestDataPath("payloads/versions/version-request.json"))

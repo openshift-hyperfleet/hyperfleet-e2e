@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("[Suite: version][perf] Delete latency",
 				versionIDs[i] = *version.Id
 			}
 
-			helper.MeasureMedianLatency("DELETE /channels/{parent_id}/versions/{id}", config.ThresholdAPIDelete, len(versionIDs),
+			helper.MeasureMedianLatency("DELETE /channels/{parent_id}/versions/{id}", config.ThresholdAPINestedWrite, len(versionIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteVersion(ctx, channelID, versionIDs[i])
 					Expect(err).NotTo(HaveOccurred())
