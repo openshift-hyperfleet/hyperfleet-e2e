@@ -144,6 +144,7 @@ podman run --rm \
 ## Development
 
 ```bash
+make install-hooks  # One-time: install pre-commit hooks (secret scanning, commitlint, linting, file hygiene)
 make build      # Build binary
 make test       # Run unit tests
 make lint       # Run linter

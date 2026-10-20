@@ -144,7 +144,7 @@ For detailed adapter architecture, see:
 2. **Adapter fetches resource details** from HyperFleet API
 3. **Precondition evaluation:**
    - Checks if dependencies are met (e.g., previous adapter completed)
-   - Finds precondition(s) not satisfied 
+   - Finds precondition(s) not satisfied
 4. **Preconditions NOT met** - Adapter skips work
 5. **Adapter reports status anyway (critical for preventing loops):**
    - `Applied: False` (no resources created)

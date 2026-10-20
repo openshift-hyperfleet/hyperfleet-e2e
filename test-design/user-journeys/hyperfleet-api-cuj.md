@@ -567,4 +567,3 @@ GET /api/hyperfleet/v1/clusters/{cluster_id}/nodepools/non-existent-nodepool-id
 - `GET /clusters/{cluster_id}/nodepools` - List all nodepools (with filtering support)
 - `GET /clusters/{cluster_id}/nodepools/{id}` - Get nodepool details and high-level status
 - `GET /clusters/{cluster_id}/nodepools/{id}/statuses` - Get detailed adapter status information
-

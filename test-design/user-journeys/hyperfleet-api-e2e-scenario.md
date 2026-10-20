@@ -198,7 +198,7 @@
       - Cluster creation payload without required fileds like name
       - Cluster creation payload with un-supported filed
       - Cluster creation payload with invalid value like region: 123 (should be string)
-      - Cluster creation payload with exsited cluster name 
+      - Cluster creation payload with exsited cluster name
       - Send request with invalid JSON syntax
    - Verify HTTP 400 Bad Request
    - Verify error message: "provider must be one of: GCP, AWS, Azure"
@@ -281,7 +281,7 @@
    - Verify adapter cannot create Job due to unknown resource
    - Verify adapter conditions in ClusterStatus.adapterStatuses:
      - Available: False (reason: "ResourceCreationFailed", message: "Failed to create Job: unknown custom resource")
-     - Applied: False 
+     - Applied: False
      - Health: False (reason: "UnexpectedError", message: "Kubernetes API rejected Job creation")
    - Verify cluster status.conditions.Reconciled = "False"
    - Verify cluster status.adapters shows adapter with available: "False"

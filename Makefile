@@ -146,6 +146,16 @@ verify: generate fmt-check vet ## Run all verification checks
 .PHONY: check
 check: verify lint test verify-tools ## Run all checks (fmt, vet, lint, test, tools)
 
+.PHONY: gofmt
+gofmt: fmt ## Alias for fmt (used by the hyperfleet-gofmt pre-commit hook)
+
+.PHONY: go-vet
+go-vet: vet ## Alias for vet (used by the hyperfleet-go-vet pre-commit hook)
+
+.PHONY: install-hooks
+install-hooks: ## Install pre-commit hooks
+	pre-commit install
+
 ##@ Container Images
 
 .PHONY: image

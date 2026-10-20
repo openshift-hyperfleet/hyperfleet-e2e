@@ -451,6 +451,9 @@ make build
 Before committing, ensure your code passes all checks:
 
 ```bash
+# One-time: install the git hooks (secret scanning, commitlint, linting, file hygiene)
+make install-hooks
+
 # Run all checks (format, lint, unit tests)
 make check
 ```

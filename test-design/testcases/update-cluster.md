@@ -520,4 +520,3 @@ curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 
 **Expected Result:**
 - Cluster and all associated resources are cleaned up
-

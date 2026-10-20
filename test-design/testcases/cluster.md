@@ -40,7 +40,7 @@ This test validates that the workflow can work correctly for clusters resource t
 
 1. Environment is prepared using [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) with all required platform resources
 2. HyperFleet API and HyperFleet Sentinel services are deployed and running successfully
-3. The adapters defined in testdata/adapter-configs are all deployed successfully 
+3. The adapters defined in testdata/adapter-configs are all deployed successfully
 
 ---
 
@@ -144,7 +144,7 @@ This test verifies that Kubernetes resources are successfully created with corre
 ### Preconditions
 
 1. Environment is prepared using [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) with all required platform resources
-2. HyperFleet API and HyperFleet Sentinel services are deployed and running successfully 
+2. HyperFleet API and HyperFleet Sentinel services are deployed and running successfully
 3. The adapters defined in testdata/adapter-configs are all deployed successfully
 
 ---
@@ -259,7 +259,7 @@ This test validates that CLM correctly handles adapter dependency relationships 
 ### Preconditions
 
 1. Environment is prepared using [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) with all required platform resources
-2. HyperFleet API and HyperFleet Sentinel services are deployed and running successfully 
+2. HyperFleet API and HyperFleet Sentinel services are deployed and running successfully
 3. The adapters defined in testdata/adapter-configs are all deployed successfully
 
 ---

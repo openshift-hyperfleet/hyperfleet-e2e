@@ -21,7 +21,7 @@ COPY . .
 ARG GIT_COMMIT=unknown
 RUN make build GIT_COMMIT=${GIT_COMMIT}
 
-RUN chmod +x /build/bin/hyperfleet-e2e  
+RUN chmod +x /build/bin/hyperfleet-e2e
 
 # Runtime stage
 FROM ${BASE_IMAGE}
