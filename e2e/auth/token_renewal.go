@@ -80,7 +80,7 @@ var _ = ginkgo.Describe("[Suite: auth][renewal] JWT Token Renewal",
 		ginkgo.It("Adapter continues reporting status across token refresh boundary",
 			func(ctx context.Context) {
 				ginkgo.By("creating a cluster and waiting for initial Reconciled state")
-				clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 				Expect(err).NotTo(HaveOccurred(), "cluster creation should succeed")
 
 				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)

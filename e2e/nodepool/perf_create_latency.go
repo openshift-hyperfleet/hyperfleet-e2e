@@ -23,7 +23,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Create-to-reconciled latency",
 			h = helper.New()
 
 			var err error
-			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {

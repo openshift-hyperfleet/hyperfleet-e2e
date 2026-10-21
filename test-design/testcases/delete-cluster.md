@@ -371,7 +371,7 @@ kubectl scale deployment/sentinel-clusters -n hyperfleet --replicas=1
 kubectl rollout status deployment/sentinel-clusters -n hyperfleet --timeout=60s
 ```
 - If the cluster still exists after Step 4, continue polling until GET returns HTTP 404 (hard-delete executes automatically when `Reconciled=True` after Sentinel resumes)
-- The framework's `h.CleanupTestResource()` helper can also handle the remaining lifecycle in `AfterEach`
+- The framework's `h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID)` helper can also handle the remaining lifecycle in `AfterEach`
 
 **Expected Result:**
 - Cluster is eventually hard-deleted (GET returns HTTP 404)
@@ -450,7 +450,7 @@ curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 
 **Action:**
 - The cluster is already soft-deleted. Poll until GET returns 404 (hard-delete executes automatically when `Reconciled=True`).
-- The framework's `h.CleanupTestResource()` helper handles this automatically in `AfterEach`.
+- The framework's `h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID)` helper handles this in `AfterEach`.
 
 **Expected Result:**
 - Cluster is hard-deleted (GET returns 404)
@@ -544,7 +544,7 @@ curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 
 **Action:**
 - The cluster is already soft-deleted. Poll until GET returns 404 (hard-delete executes automatically when `Reconciled=True`).
-- The framework's `h.CleanupTestResource()` helper handles this automatically in `AfterEach`.
+- The framework's `h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID)` helper handles this in `AfterEach`.
 
 **Expected Result:**
 - Cluster is hard-deleted (GET returns 404)
@@ -632,7 +632,7 @@ curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools
 
 **Action:**
 - The cluster is already soft-deleted. Poll until GET returns 404 (hard-delete executes automatically when `Reconciled=True`).
-- The framework's `h.CleanupTestResource()` helper handles this automatically in `AfterEach`.
+- The framework's `h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID)` helper handles this in `AfterEach`.
 
 **Expected Result:**
 - Cluster is hard-deleted (GET returns 404)

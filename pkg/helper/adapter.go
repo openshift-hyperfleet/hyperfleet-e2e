@@ -119,6 +119,9 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 	if opts.ReleaseName == "" {
 		return fmt.Errorf("AdapterDeploymentOptions.ReleaseName is required - use GenerateAdapterReleaseName() to create a unique name")
 	}
+	if opts.Entity.Plural == "" {
+		return fmt.Errorf("AdapterDeploymentOptions.Entity.Plural is required for Pub/Sub cleanup naming")
+	}
 
 	// Set default timeout if not specified
 	if opts.Timeout == 0 {

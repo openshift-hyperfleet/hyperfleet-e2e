@@ -37,7 +37,7 @@ HyperFleet E2E creates ephemeral resources per test for complete isolation.
 ```text
 Test starts
   → Create new Helper instance (helper.New())
-  → GetTestResource() creates cluster via API
+  → CreateTestResource() creates cluster via API
   → Poll for cluster Reconciled condition (pollers + matchers)
   → Execute test assertions
   → CleanupTestResource() deletes via the API; adapters remove downstream resources
@@ -133,7 +133,7 @@ Built-in Defaults (lowest priority)
 **Key Methods**:
 
 *Resource Management* (`resource.go`):
-- `GetTestResource(ctx, entity, parentID, payloadPath)` - Create a temporary resource and return its ID
+- `CreateTestResource(ctx, entity, parentID, payloadPath)` - Create a temporary resource and return its ID
 - `CleanupTestResource(ctx, entity, parentID, resourceID)` - Delete through the API using the descriptor's cleanup policy
 - `DeferCleanup(entity, parentID, resourceID)` - Register warning-only cleanup in the current Ginkgo node
 
@@ -154,22 +154,13 @@ Each row combines routing, cleanup and runtime settings; production rows read th
 existing resolved config fields and threshold constants directly. There is no
 second kind switch to update when adding a row.
 
-The ticket boundary is:
-
-- [HYPERFLEET-1726](https://redhat.atlassian.net/browse/HYPERFLEET-1726)
-  introduces the table and descriptor-based helpers while preserving the existing
-  suites and config behavior. Adding a descriptor with its settings needs one
-  table row and no helper code. Nested paths are derived from parent plural,
-  parent ID and plural.
-- [HYPERFLEET-1727](https://redhat.atlassian.net/browse/HYPERFLEET-1727)
-  replaces per-kind config fields, defaults, thresholds and environment bindings
-  with kind-keyed configuration. Automatic overrides for newly added kinds belong
-  to that ticket; this refactor does not introduce them.
-
-Fixture rows register routing and cleanup metadata only. Their adapters, timeouts
-and thresholds remain unset pending configuration and fixture deployment in
-HYPERFLEET-1727/1728/1729. They are not runnable E2E fixtures yet; registration does
-not contact an API route or establish performance baselines.
+Fixture rows register routing and cleanup metadata. `Parent` and `CascadeChild`
+use a shared two-minute deletion timeout. The catalog rejects any row with
+`Cleanup.WaitForHardDelete` and a zero or negative `Timeouts.Deleted`, so invalid
+cleanup settings fail when the helper is constructed, before it creates resources.
+Rows that do not wait for hard-delete can leave that timeout unset. Fixture
+adapters, reconciliation timeouts and performance thresholds remain unset;
+registration alone does not deploy fixtures or establish performance baselines.
 
 Cleanup policy preserves existing behavior: Cluster and NodePool wait for 404,
 Channel explicitly deletes eligible Versions before itself, and WifConfig still

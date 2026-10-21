@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 
 			// Get or create a cluster for nodepool tests
 			var err error
-			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to get test cluster")
 			ginkgo.GinkgoWriter.Printf("Using cluster ID: %s\n", clusterID)
 

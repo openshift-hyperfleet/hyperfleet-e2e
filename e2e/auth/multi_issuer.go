@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("[Suite: auth][multi-issuer] JWT Identity and Issuer Val
 		ginkgo.It("confirms adapters authenticate with JWT when reporting cluster status",
 			func(ctx context.Context) {
 				ginkgo.By("creating a cluster and waiting for Reconciled")
-				clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 				Expect(err).NotTo(HaveOccurred(), "cluster creation should succeed")
 
 				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)

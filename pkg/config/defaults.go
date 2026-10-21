@@ -43,6 +43,9 @@ const (
 	// DefaultNodePoolDeletedTimeout is the default timeout for waiting for a nodepool to be hard-deleted (404)
 	DefaultNodePoolDeletedTimeout = 2 * time.Minute
 
+	// DefaultFixtureDeletedTimeout is the shared hard-delete timeout for fixture kinds.
+	DefaultFixtureDeletedTimeout = 2 * time.Minute
+
 	// DefaultAdapterProcessingTimeout is the default timeout for waiting for adapter conditions
 	DefaultAdapterProcessingTimeout = 5 * time.Minute
 

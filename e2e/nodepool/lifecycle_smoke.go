@@ -20,7 +20,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				h := helper.New()
 
 				ginkgo.By("creating a parent cluster and waiting for Reconciled")
-				clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {

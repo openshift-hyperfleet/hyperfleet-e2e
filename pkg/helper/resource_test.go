@@ -137,7 +137,7 @@ func TestPollersPropagateErrors(t *testing.T) {
 	}
 }
 
-func TestGetTestResource(t *testing.T) {
+func TestCreateTestResource(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name, kind, parent, path, response, wantID string
@@ -164,7 +164,7 @@ func TestGetTestResource(t *testing.T) {
 				w.WriteHeader(http.StatusCreated)
 				_, _ = fmt.Fprint(w, tc.response)
 			})
-			id, err := h.GetTestResource(t.Context(), h.Entities.MustGet(tc.kind), tc.parent, payload)
+			id, err := h.CreateTestResource(t.Context(), h.Entities.MustGet(tc.kind), tc.parent, payload)
 			if (err != nil) != tc.wantErr || (!tc.wantErr && id != tc.wantID) {
 				t.Fatalf("id=%q, err=%v", id, err)
 			}
@@ -246,8 +246,51 @@ func TestCleanupHardDeletion(t *testing.T) {
 	}
 }
 
+func TestFixtureCleanupWaitsForHardDeletion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ kind, parent, path string }{
+		{"Parent", "", "/api/hyperfleet/v1/parents/id"},
+		{"CascadeChild", "parent", "/api/hyperfleet/v1/parents/parent/cascadechildren/id"},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			var methods []string
+			polls := 0
+			h := newResourceTestHelper(t, func(w http.ResponseWriter, r *http.Request) {
+				methods = append(methods, r.Method)
+				if r.URL.Path != tc.path {
+					t.Errorf("path=%q, want=%q", r.URL.Path, tc.path)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				if r.Method == http.MethodDelete {
+					w.WriteHeader(http.StatusAccepted)
+					_, _ = fmt.Fprint(w, `{}`)
+					return
+				}
+				polls++
+				if polls == 1 {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+			})
+			// Use the catalog's fixture timeout unchanged; cap a broken test with its context.
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet(tc.kind), tc.parent, "id"); err != nil {
+				t.Fatal(err)
+			}
+			want := []string{http.MethodDelete, http.MethodGet, http.MethodGet}
+			if !reflect.DeepEqual(methods, want) {
+				t.Fatalf("requests=%v, want=%v", methods, want)
+			}
+		})
+	}
+}
+
 func TestCleanupPreservesZeroTimeoutAndInterval(t *testing.T) {
 	t.Parallel()
+	// Mutate descriptors after catalog validation to cover the legacy polling loop.
 	for _, tc := range []struct {
 		name              string
 		timeout, interval time.Duration

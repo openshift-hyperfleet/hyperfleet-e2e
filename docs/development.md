@@ -195,7 +195,7 @@ ginkgo.By("verifying adapter conditions")
 Prefer `ginkgo.DeferCleanup` inline right after resource creation:
 
 ```go
-clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+clusterID, err := h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 Expect(err).NotTo(HaveOccurred())
 ginkgo.DeferCleanup(func(ctx context.Context) {
     if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
@@ -249,10 +249,11 @@ adapter slice before making temporary changes, as `stuck_deletion.go` does.
 
 Add kinds in the single table in `pkg/config/descriptor.go`, including their
 runtime settings and cleanup policy. Helpers do not dispatch on kind names.
-The current production rows use existing config fields; adding automatic config
-or environment overrides for arbitrary kinds is HYPERFLEET-1727 work. The fixture
-rows are registered but have no runtime settings yet. See the
-[descriptor/config scope boundary](architecture.md#pkghelper).
+The current production rows use existing config fields. Every row with
+`Cleanup.WaitForHardDelete` must have a positive `Timeouts.Deleted`; catalog
+validation rejects zero or negative values. `Parent` and `CascadeChild` use a
+shared two-minute deletion default. Other fixture runtime settings remain unset.
+See the [entity catalog](architecture.md#pkghelper).
 
 ### Wait for Resource Condition
 

@@ -129,7 +129,7 @@ func (e EntityDescriptor) clone() EntityDescriptor {
 	return e
 }
 
-// Validate checks routing metadata without requiring deployment-specific settings.
+// Validate checks routing metadata and settings required by the cleanup policy.
 func (e EntityDescriptor) Validate() error {
 	if strings.TrimSpace(e.Kind) == "" || !validSegment(e.Plural) {
 		return fmt.Errorf("entity kind and a valid plural are required: %q/%q", e.Kind, e.Plural)
@@ -140,6 +140,9 @@ func (e EntityDescriptor) Validate() error {
 		}
 	} else if !validSegment(e.ParentPlural) || (e.OnParentDelete != "cascade" && e.OnParentDelete != "restrict") {
 		return fmt.Errorf("entity %q requires a parent plural and cascade/restrict deletion policy", e.Kind)
+	}
+	if e.Cleanup.WaitForHardDelete && e.Timeouts.Deleted <= 0 {
+		return fmt.Errorf("entity %q requires a positive deleted timeout when waiting for hard-delete, got %s", e.Kind, e.Timeouts.Deleted)
 	}
 	return nil
 }

@@ -52,10 +52,19 @@ func TestEntityCatalogPreservesResolvedSettings(t *testing.T) {
 	if v.Thresholds.Create != ThresholdAPINestedWrite || v.Thresholds.Update != ThresholdAPINestedWrite || v.Thresholds.Delete != ThresholdAPINestedWrite {
 		t.Fatal("nested write thresholds changed")
 	}
-	for _, kind := range []string{"Parent", "CascadeChild", "RestrictChild", "Referencer", "Target"} {
-		e := catalog.MustGet(kind)
-		if len(e.RequiredAdapters) != 0 || e.Timeouts != (descriptor.EntityTimeouts{}) || e.Thresholds != (descriptor.EntityThresholds{}) {
-			t.Fatalf("fixture %s received invented runtime settings", kind)
+	for _, tc := range []struct {
+		kind    string
+		deleted time.Duration
+	}{
+		{"Parent", DefaultFixtureDeletedTimeout},
+		{"CascadeChild", DefaultFixtureDeletedTimeout},
+		{"RestrictChild", 0},
+		{"Referencer", 0},
+		{"Target", 0},
+	} {
+		e := catalog.MustGet(tc.kind)
+		if len(e.RequiredAdapters) != 0 || e.Timeouts != (descriptor.EntityTimeouts{Deleted: tc.deleted}) || e.Thresholds != (descriptor.EntityThresholds{}) {
+			t.Fatalf("fixture %s has unexpected runtime settings: %+v", tc.kind, e)
 		}
 	}
 }
@@ -63,6 +72,7 @@ func TestEntityCatalogPreservesResolvedSettings(t *testing.T) {
 func TestEntityCatalogRoutes(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{}
+	cfg.applyDefaults()
 	catalog, err := cfg.EntityCatalog()
 	if err != nil {
 		t.Fatal(err)
@@ -100,6 +110,7 @@ func TestEntityCatalogRoutes(t *testing.T) {
 func TestAdditionalDescriptorNeedsOnlyOneRow(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{}
+	cfg.applyDefaults()
 	rows := append(cfg.entityDescriptors(), descriptor.EntityDescriptor{
 		Kind: "Widget", Plural: "widgets", ParentKind: "Parent", OnParentDelete: "cascade",
 		RequiredAdapters: []string{"widget-success"},

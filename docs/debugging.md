@@ -294,7 +294,7 @@ make e2e
 
 ### Test Cleanup Flow
 
-For adapter-backed production resources, `CleanupTestResource()` deletes through the API and waits for hard-delete (404); the adapters remove the resources they created, and `cl-desire` removes its remote objects through the applier. For the full cleanup lifecycle, see [architecture.md](architecture.md).
+For Cluster and NodePool, `CleanupTestResource` deletes through the API and waits for hard-delete (404). Their adapters remove the resources they created; `cl-desire` removes its remote objects through the applier. Other entities use different cleanup policies: Channel deletes its Versions before itself, and WifConfig tolerates conflicts during cleanup. For the full cleanup lifecycle, see [architecture.md](architecture.md).
 
 ### Detecting Test Pollution
 

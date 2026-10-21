@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPathsPreserveIDConcatenation(t *testing.T) {
@@ -54,6 +55,35 @@ func TestCatalogRejectsInvalidDefinitions(t *testing.T) {
 			_, err := NewCatalog(tc.rows)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("got %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCatalogValidatesHardDeleteTimeout(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		wait    bool
+		timeout time.Duration
+		wantErr bool
+	}{
+		{"zero timeout", true, 0, true},
+		{"negative timeout", true, -time.Second, true},
+		{"positive timeout", true, time.Second, false},
+		{"no hard-delete polling", false, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := NewCatalog([]EntityDescriptor{{
+				Kind: "Fixture", Plural: "fixtures",
+				Timeouts: EntityTimeouts{Deleted: tc.timeout},
+				Cleanup:  CleanupPolicy{WaitForHardDelete: tc.wait},
+			}})
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err=%v, wantErr=%v", err, tc.wantErr)
+			}
+			if tc.wantErr && (!strings.Contains(err.Error(), "Fixture") || !strings.Contains(err.Error(), "positive deleted timeout")) {
+				t.Fatalf("error does not identify the invalid entity setting: %v", err)
 			}
 		})
 	}

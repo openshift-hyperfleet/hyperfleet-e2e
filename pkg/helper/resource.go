@@ -13,8 +13,8 @@ import (
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 )
 
-// GetTestResource creates a temporary resource from a payload and returns its ID.
-func (h *Helper) GetTestResource(ctx context.Context, entity descriptor.EntityDescriptor, parentID, payloadPath string) (string, error) {
+// CreateTestResource creates a temporary resource from a payload and returns its ID.
+func (h *Helper) CreateTestResource(ctx context.Context, entity descriptor.EntityDescriptor, parentID, payloadPath string) (string, error) {
 	path := entity.CollectionPath(parentID)
 	resource, err := h.Client.CreateResourceFromPayload(ctx, path, payloadPath)
 	if err != nil {
