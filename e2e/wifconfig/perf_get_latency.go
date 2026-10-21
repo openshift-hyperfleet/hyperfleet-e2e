@@ -27,7 +27,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] API read latency",
 			wifConfigID = *wifConfig.Id
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestWifConfig(ctx, wifConfigID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("WifConfig"), "", wifConfigID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup wifconfig %s: %v\n", wifConfigID, err)
 				}
 			})

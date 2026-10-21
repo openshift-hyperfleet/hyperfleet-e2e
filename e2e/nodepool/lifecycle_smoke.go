@@ -20,16 +20,16 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				h := helper.New()
 
 				ginkgo.By("creating a parent cluster and waiting for Reconciled")
-				clusterID, err := h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 						ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 					}
 				})
 
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("creating a nodepool")
@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				nodepoolID := *np.Id
 
 				ginkgo.By("waiting for Reconciled=True at generation 1")
-				Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("PATCHing nodepool spec to trigger generation bump")
@@ -52,11 +52,11 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				Expect(patched.Generation).To(Equal(int32(2)), "generation should increment after PATCH")
 
 				ginkgo.By("waiting for Reconciled=True at generation 2")
-				Eventually(h.PollNodePoolAdapterStatuses(ctx, clusterID, nodepoolID),
+				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
 					h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.NodePool, int32(2)))
 
-				Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("soft-deleting the nodepool")
@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				Expect(deletedNP.DeletedTime).NotTo(BeNil())
 
 				ginkgo.By("waiting for hard-delete (404)")
-				Eventually(h.PollNodePoolHTTPStatus(ctx, clusterID, nodepoolID),
+				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
 					h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(Equal(http.StatusNotFound))
 

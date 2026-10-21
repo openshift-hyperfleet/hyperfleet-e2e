@@ -1,8 +1,17 @@
 package helper
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestPatchEntityRequiredAdapters(t *testing.T) {
@@ -119,5 +128,109 @@ func TestPatchEntityRequiredAdapters(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Exercise the real get/patch/upgrade/ready/restore call chain with a local Helm
+// stand-in. No Kubernetes or Helm installation is used by these tests.
+func TestUpgradeAndRestoreDescriptorAdapters(t *testing.T) {
+	const originalValues = `image:
+  tag: keep-this
+config:
+  server:
+    jwt:
+      enabled: true
+  entities:
+    - kind: Cluster
+      plural: clusters
+      required_adapters: [cl-base]
+    - kind: NodePool
+      plural: nodepools
+      parent_kind: Cluster
+      on_parent_delete: cascade
+      required_adapters: [np-base]
+`
+	dir := t.TempDir()
+	input := filepath.Join(dir, "input.yaml")
+	applied := filepath.Join(dir, "applied.yaml")
+	if err := os.WriteFile(input, []byte(originalValues), 0600); err != nil {
+		t.Fatal(err)
+	}
+	script := `#!/bin/sh
+set -eu
+case "$1 $2" in
+  "get values")
+    cat "$HELM_TEST_INPUT"
+    echo 'warning: this is stderr, not YAML' >&2
+    ;;
+  "upgrade hyperfleet-api")
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = "--values" ]; then cp "$2" "$HELM_TEST_APPLIED"; exit 0; fi
+      shift
+    done
+    exit 2
+    ;;
+  *) exit 3 ;;
+esac
+`
+	// #nosec G306 -- this private test fixture must be executable by exec.CommandContext.
+	if err := os.WriteFile(filepath.Join(dir, "helm"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("HELM_TEST_INPUT", input)
+	t.Setenv("HELM_TEST_APPLIED", applied)
+	readyCalls := 0
+	h := newResourceTestHelper(t, func(w http.ResponseWriter, r *http.Request) {
+		readyCalls++
+		if r.Method != http.MethodGet || r.URL.Path != "/api/hyperfleet/v1/nodepools" {
+			t.Errorf("readiness still tied to the wrong entity: %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = fmt.Fprint(w, `{"items":[]}`)
+	})
+	e := h.Entities.MustGet("NodePool")
+	e.RequiredAdapters = []string{"np-base"}
+	baseline := h.GetAPIRequiredAdapters(e)
+	updated := append(append([]string{}, baseline...), "np-crash")
+	if err := h.UpgradeAPIRequiredAdapters(t.Context(), e, "chart", "namespace", updated); err != nil {
+		t.Fatal(err)
+	}
+	assertApplied := func(want []string) {
+		t.Helper()
+		// #nosec G304 -- applied is a fixed filename inside this test's t.TempDir().
+		data, err := os.ReadFile(applied)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got, before apiValues
+		if err := yaml.Unmarshal(data, &got); err != nil {
+			t.Fatal(err)
+		}
+		if err := yaml.Unmarshal([]byte(originalValues), &before); err != nil {
+			t.Fatal(err)
+		}
+		before.Config.Entities[1].RequiredAdapters = want
+		if !reflect.DeepEqual(got, before) {
+			t.Fatalf("Helm round-trip changed unrelated values:\n%s", data)
+		}
+	}
+	assertApplied(updated)
+	if err := h.RestoreAPIRequiredAdaptersWithRetry(t.Context(), e, "chart", "namespace", baseline, 1); err != nil {
+		t.Fatal(err)
+	}
+	assertApplied([]string{"np-base"})
+	if readyCalls != 2 || e.RequiredAdapters[0] != "np-base" {
+		t.Fatalf("readiness calls=%d, baseline=%v", readyCalls, e.RequiredAdapters)
+	}
+	missing := e
+	missing.Kind = "NotDeployed"
+	if err := h.UpgradeAPIRequiredAdapters(t.Context(), missing, "chart", "namespace", nil); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("missing entity silently accepted: %v", err)
+	}
+	assertApplied([]string{"np-base"})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, e, "chart", "namespace", baseline, 2); !errors.Is(err, context.Canceled) {
+		t.Fatalf("restore lost cancellation: %v", err)
 	}
 }

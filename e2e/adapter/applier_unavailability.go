@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport][negative] Adapter re
 					if err := h.ScaleDeploymentBySelector(ctx, ns, applierSelector, applierReplicas); err != nil {
 						ginkgo.GinkgoWriter.Printf("Warning: failed to restore the applier before cluster cleanup: %v\n", err)
 					}
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
 					}
 				})
@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport][negative] Adapter re
 
 				ginkgo.By("verifying the cluster stays unreconciled and nothing reaches the target")
 				Consistently(func(g Gomega) {
-					cl, err := h.PollCluster(ctx, clusterID)()
+					cl, err := h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID)()
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(cl).To(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusFalse),
 						"cluster Reconciled should remain False while the applier is unavailable")
@@ -122,11 +122,11 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport][negative] Adapter re
 					To(Succeed(), "failed to restore the applier")
 
 				ginkgo.By("verifying the cluster converges once the applier is back")
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying the remote adapter reports Applied, Available and Health True at the cluster generation")
-				Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(helper.HaveAllAdaptersAtGeneration([]string{adapter}, cluster.Generation))
 
 				_, err = h.K8sClient.FetchNamespace(ctx, remote)

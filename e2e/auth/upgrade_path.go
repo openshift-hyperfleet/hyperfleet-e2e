@@ -48,13 +48,13 @@ var _ = ginkgo.Describe("[Suite: auth][upgrade] JWT Upgrade Path Validation",
 				Expect(cluster.Id).NotTo(BeNil())
 				clusterID := *cluster.Id
 
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
 				Expect(cluster.CreatedBy).To(HaveValue(Equal(expected)),
 					"identity_claim=sub should resolve the configured service-account identity")
 
 				ginkgo.By("3. Verifying Sentinel auth: cluster reaches Reconciled")
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue),
 						"Sentinel must authenticate to API and publish events for cluster to reach Reconciled")
 

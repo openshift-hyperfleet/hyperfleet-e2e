@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				}
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					for _, id := range clusterIDs {
-						if err := h.CleanupTestCluster(ctx, id); err != nil {
+						if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", id); err != nil {
 							ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", id, err)
 						}
 					}
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				ginkgo.By("Wait for all clusters to reach Reconciled=True and Available=True")
 				for i, clusterID := range clusterIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for cluster %d (%s) to become Reconciled...\n", i, clusterID)
-					Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					cluster, err := h.Client.GetCluster(ctx, clusterID)

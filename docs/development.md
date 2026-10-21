@@ -100,13 +100,13 @@ var _ = ginkgo.Describe(testName,
             Expect(err).NotTo(HaveOccurred())
             clusterID = *cluster.Id
             ginkgo.DeferCleanup(func(ctx context.Context) {
-                if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+                if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
                     ginkgo.GinkgoWriter.Printf("Warning: cleanup failed: %v\n", err)
                 }
             })
 
             ginkgo.By("waiting for cluster to become Reconciled")
-            Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+            Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
                 Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
         })
     },
@@ -195,10 +195,10 @@ ginkgo.By("verifying adapter conditions")
 Prefer `ginkgo.DeferCleanup` inline right after resource creation:
 
 ```go
-clusterID, err := h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 Expect(err).NotTo(HaveOccurred())
 ginkgo.DeferCleanup(func(ctx context.Context) {
-    if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+    if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
         ginkgo.GinkgoWriter.Printf("Warning: cleanup failed: %v\n", err)
     }
 })
@@ -220,7 +220,7 @@ Expect(cluster.Id).NotTo(BeNil())
 Expect(cluster.Generation).To(Equal(int32(1)))
 
 // Async: use pollers + custom matchers (preferred)
-Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 // Async: use func(g Gomega) for complex one-off assertions
@@ -237,15 +237,32 @@ Eventually(func(g Gomega) {
 
 The framework uses **pollers** (functions that fetch current state) and **custom matchers** (reusable Gomega assertions) to compose async checks. This avoids a combinatorial explosion of `WaitFor*` helper functions.
 
+Resolve descriptors after `helper.New()` so they include the configured adapter
+lists and timeouts. `h.Entities.MustGet("Cluster")` is for known kind literals;
+`h.Entities.Lookup(kind)` returns an error for unknown runtime input. Helpers take
+`(ctx, entity, parentID, resourceID)`, with an empty parent ID for root resources.
+Pass the same descriptor to `AdapterDeploymentOptions.Entity`,
+`GenerateAdapterReleaseName`, and adapter cleanup. API adapter-list upgrades and
+restoration also take that descriptor; `GetAPIRequiredAdapters(entity)` returns the
+descriptor's configured baseline, not the current live Helm values. Copy the
+adapter slice before making temporary changes, as `stuck_deletion.go` does.
+
+Add kinds in the single table in `pkg/config/descriptor.go`, including their
+runtime settings and cleanup policy. Helpers do not dispatch on kind names.
+The current production rows use existing config fields; adding automatic config
+or environment overrides for arbitrary kinds is HYPERFLEET-1727 work. The fixture
+rows are registered but have no runtime settings yet. See the
+[descriptor/config scope boundary](architecture.md#pkghelper).
+
 ### Wait for Resource Condition
 
 ```go
 // Cluster
-Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-// NodePool (same matcher, different poller)
-Eventually(h.PollNodePool(ctx, clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+// NodePool (same poller and matcher, with parent context)
+Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 ```
 
@@ -253,18 +270,18 @@ Eventually(h.PollNodePool(ctx, clusterID, npID), h.Cfg.Timeouts.NodePool.Reconci
 
 ```go
 // All adapters finalized
-Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), timeout, h.Cfg.Polling.Interval).
+Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), timeout, h.Cfg.Polling.Interval).
     Should(helper.HaveAllAdaptersWithCondition(h.Cfg.Adapters.Cluster, client.ConditionTypeFinalized, client.AdapterConditionStatusTrue))
 
 // All adapters at a specific generation with Applied+Available+Health=True
-Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), timeout, h.Cfg.Polling.Interval).
+Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), timeout, h.Cfg.Polling.Interval).
     Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
 ```
 
 ### Wait for Hard-Delete
 
 ```go
-Eventually(h.PollClusterHTTPStatus(ctx, clusterID), timeout, h.Cfg.Polling.Interval).
+Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), timeout, h.Cfg.Polling.Interval).
     Should(Equal(http.StatusNotFound))
 ```
 
@@ -388,14 +405,14 @@ Expect(err).NotTo(HaveOccurred())
 ### Wait for Condition
 
 ```go
-Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 ```
 
 ### Wait for All Adapters at Generation
 
 ```go
-Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
     Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
 ```
 

@@ -27,7 +27,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] API read latency",
 			channelID = *channel.Id
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestChannel(ctx, channelID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup channel %s: %v\n", channelID, err)
 				}
 			})

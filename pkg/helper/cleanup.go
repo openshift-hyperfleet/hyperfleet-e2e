@@ -117,7 +117,7 @@ func (c *CleanupHelper) SweepPubsubTestAdapterResources(ctx context.Context) err
 	deployments := c.adapterDeploymentList.Snapshot()
 	var errorList []string
 	for _, deployment := range deployments {
-		resourceType := deployment.ResourceType
+		resourceType := deployment.ResourcePlural
 		adapterName := deployment.AdapterName
 		namespace := c.cfg.Namespace
 		projectID := c.cfg.GCPProjectID

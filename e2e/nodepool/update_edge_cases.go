@@ -23,10 +23,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 
 			ginkgo.By("creating cluster and waiting for Reconciled")
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("creating nodepool and waiting for Reconciled at generation 1")
@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 			Expect(np.Id).NotTo(BeNil())
 			nodepoolID = *np.Id
 
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -62,13 +62,13 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 				"generation should increment after labels-only PATCH")
 
 			ginkgo.By("waiting for all nodepool adapters to reconcile at generation 2")
-			Eventually(h.PollNodePoolAdapterStatuses(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.NodePool, int32(2)))
 
 			ginkgo.By("verifying nodepool reaches Reconciled=True and LastKnownReconciled=True")
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeLastKnownReconciled, client.ResourceConditionStatusTrue))
 
 			finalNP, err := h.Client.GetNodePool(ctx, clusterID, nodepoolID)
@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] Labels-Only PATCH",
 				return
 			}
 			ginkgo.By("cleaning up cluster " + clusterID)
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})

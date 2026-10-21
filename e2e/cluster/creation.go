@@ -31,7 +31,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 			ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, clusterName)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
 				}
 			})
@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					ginkgo.By("Verify final cluster state")
 					// Wait for cluster Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the cluster has reached the desired end state
-					Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					finalCluster, err := h.Client.GetCluster(ctx, clusterID)
@@ -226,7 +226,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					ginkgo.By("Verify final cluster state to ensure Reconciled before cleanup")
 					// Wait for cluster Reconciled condition to prevent namespace deletion conflicts
 					// Without this, adapters may still be creating resources during cleanup
-					Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 				})
 		})

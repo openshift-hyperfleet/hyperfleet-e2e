@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 
 			ginkgo.By("creating cluster and waiting for Reconciled")
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -34,12 +34,12 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 						ginkgo.GinkgoWriter.Printf("Warning: API delete failed for cluster %s: %v\n", clusterID, err)
 					}
 				}
-				if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 				}
 			})
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("creating nodepool and waiting for Reconciled")
@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 			Expect(np.Id).NotTo(BeNil(), "nodepool ID should be generated")
 			nodepoolID = *np.Id
 
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] NodePool Deletion Lifecycle",
 			}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 
 			ginkgo.By("confirming nodepool is hard-deleted")
-			Eventually(h.PollNodePoolHTTPStatus(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			ginkgo.By("verifying parent cluster is unaffected")

@@ -54,7 +54,7 @@ Run `make check` before you call work done, then `make build`.
 Use `Eventually` with a poller and a matcher in the spec itself. Do not write `WaitFor*` helpers that hide `Eventually`.
 
 ```go
-Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 ```
 
@@ -64,7 +64,7 @@ Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.C
 
 ### Cleanup
 
-- Register `ginkgo.DeferCleanup` right after you create each resource. Helpers such as `h.DeferClusterCleanup` exist in `pkg/helper/helper.go`.
+- Register `ginkgo.DeferCleanup` right after you create each resource. Use `h.DeferCleanup(entity, parentID, resourceID)` for warning-only cleanup.
 - Exception: in an `Ordered` container where a later spec uses a resource an earlier spec created, register the cleanup in `BeforeAll`. A `DeferCleanup` made inside an `It` runs when that `It` ends, before the later specs run. Say so in a comment, as `e2e/adapter/adapter_with_remote_transport.go` does.
 
 ### Payloads
@@ -83,6 +83,8 @@ if expected := h.ExpectedIdentity(); expected != "" {
 ```
 
 ## Gotchas
+
+- Resolve a known descriptor after `helper.New()` with `h.Entities.MustGet("Cluster")`; use `Lookup` for runtime kind names. Generic resource helpers take a descriptor and parent ID (empty for roots).
 
 - Adapter names come from config at runtime: `h.Cfg.Adapters.Cluster` and `h.Cfg.Adapters.NodePool`. Never hardcode them. `configs/config.yaml` (for example `cl-namespace`) overrides the compiled defaults in `pkg/config/defaults.go` (for example `clusters-namespace`).
 - Config priority: CLI flags > `HYPERFLEET_*` env vars > `configs/config.yaml` > `pkg/config/defaults.go`. Config file path: `--config` > `HYPERFLEET_CONFIG` > `./configs/config.yaml`.

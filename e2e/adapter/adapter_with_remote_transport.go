@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 			// would otherwise leak.
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				for _, id := range createdIDs {
-					if err := h.CleanupTestCluster(ctx, id); err != nil {
+					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", id); err != nil {
 						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", id, err)
 					}
 				}
@@ -92,11 +92,11 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				ginkgo.By("waiting for the cluster to become Reconciled")
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying the remote adapter reports Applied, Available and Health True at the cluster generation")
-				Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(helper.HaveAllAdaptersAtGeneration([]string{adapter}, generation))
 
 				ginkgo.By("verifying the applier created both objects")
@@ -169,7 +169,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				// discards, so the API still shows the pre-delete status.
 				ginkgo.By("verifying the cluster is not finalized while the ConfigMap is held")
 				Consistently(func(g Gomega) {
-					status, err := h.PollClusterHTTPStatus(ctx, clusterID)()
+					status, err := h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID)()
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(status).To(Equal(http.StatusOK), "cluster %s should not be hard-deleted", clusterID)
 
@@ -197,7 +197,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				// Hard-delete runs inside the status POST that computes Reconciled=True from
 				// the required adapters' Finalized=True, so the 404 proves the adapter
 				// finalized; Finalized=True itself may never be observable.
-				Eventually(h.PollClusterHTTPStatus(ctx, clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.By("checking once, without retry, that the remote Namespace is gone")

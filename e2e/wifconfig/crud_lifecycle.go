@@ -30,7 +30,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 			ginkgo.GinkgoWriter.Printf("Created wifconfig ID: %s, Name: %s\n", wifConfigID, wifConfig.Name)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestWifConfig(ctx, wifConfigID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("WifConfig"), "", wifConfigID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup wifconfig %s: %v\n", wifConfigID, err)
 				}
 			})

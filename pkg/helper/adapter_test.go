@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -61,7 +62,7 @@ func TestGenerateAdapterReleaseName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateAdapterReleaseName(tt.resourceType, tt.adapterName)
+			got := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: tt.resourceType}, tt.adapterName)
 
 			if len(got) > maxReleaseNameLength {
 				t.Errorf("length %d exceeds max %d: %q", len(got), maxReleaseNameLength, got)
@@ -100,8 +101,8 @@ func TestGenerateAdapterReleaseName_Deterministic(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("%s-%s", tc.resourceType, tc.adapterName), func(t *testing.T) {
-			a := GenerateAdapterReleaseName(tc.resourceType, tc.adapterName)
-			b := GenerateAdapterReleaseName(tc.resourceType, tc.adapterName)
+			a := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: tc.resourceType}, tc.adapterName)
+			b := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: tc.resourceType}, tc.adapterName)
 			if a != b {
 				t.Errorf("non-deterministic output: %q != %q", a, b)
 			}
@@ -113,11 +114,58 @@ func TestGenerateAdapterReleaseName_Deterministic(t *testing.T) {
 // long names sharing a long common prefix produce distinct release names.
 // The hash suffix is what guarantees uniqueness once the base is truncated.
 func TestGenerateAdapterReleaseName_LongNameCollision(t *testing.T) {
-	a := GenerateAdapterReleaseName("clusters", "adapter-alpha-very-long-name-here")
-	b := GenerateAdapterReleaseName("clusters", "adapter-bravo-very-long-name-here")
+	a := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: "clusters"}, "adapter-alpha-very-long-name-here")
+	b := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: "clusters"}, "adapter-bravo-very-long-name-here")
 
 	if a == b {
 		t.Errorf("different inputs produced same release name: %q", a)
+	}
+}
+
+func TestAdapterDescriptorCleanupNames(t *testing.T) {
+	var subscription, topic string
+	oldSub, oldTopic := newPubSubDeleteFunc, newPubSubTopicDeleteFunc
+	t.Cleanup(func() { newPubSubDeleteFunc, newPubSubTopicDeleteFunc = oldSub, oldTopic })
+	newPubSubDeleteFunc = func(_ context.Context, project, id string) (func(context.Context) error, func(), error) {
+		if project != "test-project" {
+			t.Errorf("unexpected project %s", project)
+		}
+		subscription = id
+		return func(context.Context) error { return nil }, func() {}, nil
+	}
+	newPubSubTopicDeleteFunc = func(_ context.Context, project, id string) (func(context.Context) error, func(), error) {
+		if project != "test-project" {
+			t.Errorf("unexpected project %s", project)
+		}
+		topic = id
+		return func(context.Context) error { return nil }, func() {}, nil
+	}
+	cfg := &config.Config{Namespace: "test-ns", GCPProjectID: "test-project", BrokerType: "googlepubsub"}
+	h := &Helper{Cfg: cfg}
+	entity := descriptor.EntityDescriptor{Kind: "Widget", Plural: "widgets"}
+	if err := h.DeletePubSubResourcesForAdapter(t.Context(), entity, "success"); err != nil {
+		t.Fatal(err)
+	}
+	if subscription != "test-ns-widgets-success" || topic != "test-ns-widgets-success-dlq" {
+		t.Fatalf("wrong broker names: %s, %s", subscription, topic)
+	}
+	deployments := InitAdapterDeploymentList()
+	deployments.Add(AdapterDeployment{ReleaseName: GenerateAdapterReleaseName(entity, "success"), AdapterName: "success", ResourcePlural: entity.Plural})
+	subscription, topic = "", ""
+	sweeper := &CleanupHelper{cfg: cfg, adapterDeploymentList: deployments}
+	if err := sweeper.SweepPubsubTestAdapterResources(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if subscription != "test-ns-widgets-success" || topic != "test-ns-widgets-success-dlq" {
+		t.Fatalf("suite cleanup disagrees: %s, %s", subscription, topic)
+	}
+	cfg.BrokerType = "rabbitmq"
+	subscription, topic = "", ""
+	if err := h.DeletePubSubResourcesForAdapter(t.Context(), entity, "success"); err != nil {
+		t.Fatal(err)
+	}
+	if subscription != "" || topic != "" {
+		t.Fatal("non-Pub/Sub adapter attempted Pub/Sub cleanup")
 	}
 }
 

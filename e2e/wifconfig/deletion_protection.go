@@ -42,11 +42,11 @@ var _ = ginkgo.Describe("[Suite: wifconfig][delete-restrict] WIF Config Deletion
 			ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s (references wifconfig %s)\n", clusterID, cluster.Name, wifConfigID)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestWifConfig(ctx, wifConfigID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("WifConfig"), "", wifConfigID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup wifconfig %s: %v\n", wifConfigID, err)
 				}
 			})
-			h.DeferClusterCleanup(clusterID)
+			h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 		})
 
 		ginkgo.It("should return 409 when deleting wifconfig referenced by a cluster", func(ctx context.Context) {
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][delete-restrict] WIF Config Deletion
 			Expect(err).NotTo(HaveOccurred(), "failed to delete cluster")
 
 			ginkgo.By("waiting for cluster hard-delete")
-			Eventually(h.PollClusterHTTPStatus(ctx, clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound), "cluster should be hard-deleted")
 
 			ginkgo.By("deleting the wifconfig after cluster is gone")

@@ -30,7 +30,7 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 			ginkgo.GinkgoWriter.Printf("Created channel ID: %s, Name: %s\n", channelID, channel.Name)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestChannel(ctx, channelID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup channel %s: %v\n", channelID, err)
 				}
 			})

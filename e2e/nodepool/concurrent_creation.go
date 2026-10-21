@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 
 			// Get or create a cluster for nodepool tests
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to get test cluster")
 			ginkgo.GinkgoWriter.Printf("Using cluster ID: %s\n", clusterID)
 
@@ -104,7 +104,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 				ginkgo.By("Wait for all nodepools to reach Reconciled=True and Available=True")
 				for i, npID := range nodepoolIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for nodepool %d (%s) to become Reconciled...\n", i, npID)
-					Eventually(h.PollNodePool(ctx, clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					np, err := h.Client.GetNodePool(ctx, clusterID, npID)
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 				return
 			}
 			ginkgo.By("cleaning up cluster " + clusterID)
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})

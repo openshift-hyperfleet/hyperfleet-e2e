@@ -25,10 +25,10 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Re-DELETE Idempotency and API 
 
 			ginkgo.By("creating cluster and waiting for Reconciled")
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Re-DELETE Idempotency and API 
 					ginkgo.GinkgoWriter.Printf("Warning: API delete failed for cluster %s: %v\n", clusterID, err)
 				}
 			}
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})
@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] DELETE During Update Reconcili
 			Expect(cluster.Id).NotTo(BeNil())
 			clusterID = *cluster.Id
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] DELETE During Update Reconcili
 				"generation should be 3: create(1) + PATCH(2) + DELETE(3)")
 
 			ginkgo.By("verifying cluster is hard-deleted")
-			Eventually(h.PollClusterHTTPStatus(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			ginkgo.By("verifying downstream K8s namespace is cleaned up")
@@ -130,7 +130,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] DELETE During Update Reconcili
 					ginkgo.GinkgoWriter.Printf("Warning: API delete failed for cluster %s: %v\n", clusterID, err)
 				}
 			}
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})
@@ -155,7 +155,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 			firstClusterID = *cluster.Id
 			originalCluster = cluster
 
-			Eventually(h.PollCluster(ctx, firstClusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", firstClusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -164,7 +164,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 			_, err := h.Client.DeleteCluster(ctx, firstClusterID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollClusterHTTPStatus(ctx, firstClusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", firstClusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			ginkgo.By("waiting for namespace cleanup from first cluster")
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 				"new cluster should start at generation 1")
 
 			ginkgo.By("waiting for the new cluster to reach Reconciled")
-			Eventually(h.PollCluster(ctx, secondClusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", secondClusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("verifying the old cluster is still gone")
@@ -213,7 +213,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 						ginkgo.GinkgoWriter.Printf("Warning: API delete failed for cluster %s: %v\n", id, err)
 					}
 				}
-				if err := h.CleanupTestCluster(ctx, id); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", id); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", id, err)
 				}
 			}

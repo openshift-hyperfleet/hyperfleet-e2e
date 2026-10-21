@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: auth][multi-issuer] JWT Identity and Issuer Val
 				Expect(cluster.Id).NotTo(BeNil())
 				clusterID := *cluster.Id
 
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
 				Expect(cluster.CreatedBy).To(HaveValue(Equal(expected)),
 					"created_by should contain the JWT sub claim identity")
@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("[Suite: auth][multi-issuer] JWT Identity and Issuer Val
 					"updated_by should contain the JWT sub claim identity")
 
 				ginkgo.By("waiting for cluster to reconcile before delete")
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("deleting the cluster and verifying deleted_by")
@@ -106,7 +106,7 @@ var _ = ginkgo.Describe("[Suite: auth][multi-issuer] JWT Identity and Issuer Val
 				Expect(cluster.Id).NotTo(BeNil())
 				clusterID := *cluster.Id
 
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
 				ginkgo.By("verifying audit field shows the alternative SA identity")
 				expectedAltIdentity := fmt.Sprintf("system:serviceaccount:%s:%s", ns, altSAName)
@@ -142,12 +142,12 @@ var _ = ginkgo.Describe("[Suite: auth][multi-issuer] JWT Identity and Issuer Val
 		ginkgo.It("confirms adapters authenticate with JWT when reporting cluster status",
 			func(ctx context.Context) {
 				ginkgo.By("creating a cluster and waiting for Reconciled")
-				clusterID, err := h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 				Expect(err).NotTo(HaveOccurred(), "cluster creation should succeed")
 
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying adapter status reports were recorded")

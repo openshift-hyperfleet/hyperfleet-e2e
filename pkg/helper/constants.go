@@ -7,12 +7,4 @@ const (
 	TestWorkDir = ".test-work"
 )
 
-const (
-	ResourceTypeClusters  = "clusters"
-	ResourceTypeNodepools = "nodepools"
-
-	SentinelClustersRelease  = "sentinel-clusters"
-	SentinelNodePoolsRelease = "sentinel-nodepools"
-
-	defaultGCPProjectID = "hcm-hyperfleet"
-)
+const defaultGCPProjectID = "hcm-hyperfleet"

@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API list latency with filters an
 			clusterID = *cluster.Id
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
 				}
 			})

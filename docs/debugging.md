@@ -294,7 +294,7 @@ make e2e
 
 ### Test Cleanup Flow
 
-Each test's cleanup calls `CleanupTestCluster()`, which deletes the cluster through the API and waits for the hard-delete (404); the adapters remove the resources they created, and `cl-desire` removes its remote objects through the applier. For the full cleanup lifecycle, see [architecture.md](architecture.md).
+For adapter-backed production resources, `CleanupTestResource()` deletes through the API and waits for hard-delete (404); the adapters remove the resources they created, and `cl-desire` removes its remote objects through the applier. For the full cleanup lifecycle, see [architecture.md](architecture.md).
 
 ### Detecting Test Pollution
 

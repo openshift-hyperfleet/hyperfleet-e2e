@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 
 			// Get or create cluster for nodepool tests
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to get test cluster")
 			ginkgo.GinkgoWriter.Printf("Using cluster ID: %s\n", clusterID)
 
@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					ginkgo.By("Verify final nodepool state")
 					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the nodepool has reached the desired end state
-					Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					finalNodePool, err := h.Client.GetNodePool(ctx, clusterID, nodepoolID)
@@ -206,7 +206,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the nodepool workflow completed successfully and all K8s resources were created
 					// Without this, adapters may still be creating resources during cleanup
-					Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 				})
 		})
@@ -216,7 +216,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 				return
 			}
 			ginkgo.By("cleaning up cluster " + clusterID)
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})

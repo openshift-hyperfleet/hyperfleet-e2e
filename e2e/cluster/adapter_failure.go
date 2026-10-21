@@ -49,9 +49,9 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 
 			// Set up base deployment options with common fields
 			baseDeployOpts = helper.AdapterDeploymentOptions{
-				Namespace:    h.Cfg.Namespace,
-				ChartPath:    chartPath,
-				ResourceType: helper.ResourceTypeClusters,
+				Namespace: h.Cfg.Namespace,
+				ChartPath: chartPath,
+				Entity:    h.Entities.MustGet("Cluster"),
 			}
 		})
 
@@ -67,7 +67,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				})
 
 				// Generate unique release name for this deployment
-				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
+				releaseName := helper.GenerateAdapterReleaseName(h.Entities.MustGet("Cluster"), adapterName)
 
 				// Deploy the adapter with an invalid API URL in params
 				ginkgo.By("Deploy dedicated adapter with invalid API URL in params")
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 
 					if h.Cfg.BrokerType == "googlepubsub" {
 						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, adapterName, deployOpts.ResourceType); err != nil {
+						if err := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); err != nil {
 							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
 						}
 					}
@@ -108,7 +108,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				// Ensure cluster cleanup happens after this test
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Cleanup test cluster " + clusterID)
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
 					}
 				})

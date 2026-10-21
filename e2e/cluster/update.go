@@ -27,12 +27,12 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 			clusterID = *cluster.Id
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 				}
 			})
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 			}
 
 			ginkgo.By("waiting for all adapters to reconcile at new generation")
-			Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
 
 			ginkgo.By("verifying cluster reaches Reconciled=True at new generation")

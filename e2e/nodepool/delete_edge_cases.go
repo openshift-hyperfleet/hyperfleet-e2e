@@ -25,10 +25,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 
 			ginkgo.By("creating cluster and waiting for Reconciled")
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("creating two nodepools")
@@ -43,10 +43,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			nodepoolID2 = *np2.Id
 
 			ginkgo.By("waiting for both nodepools to reach Reconciled")
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID1), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID1), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID2), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID2), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			Expect(deletedNP.DeletedTime).NotTo(BeNil())
 
 			ginkgo.By("waiting for the deleted nodepool to be hard-deleted")
-			Eventually(h.PollNodePoolHTTPStatus(ctx, clusterID, nodepoolID1), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID1), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			ginkgo.By("verifying sibling nodepool is unaffected")
@@ -69,7 +69,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			Expect(hasReconciled).To(BeTrue(), "sibling nodepool should remain Reconciled=True")
 
 			ginkgo.By("verifying sibling nodepool adapter statuses are intact")
-			Eventually(h.PollNodePoolAdapterStatuses(ctx, clusterID, nodepoolID2), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID2), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(helper.HaveAllAdaptersWithCondition(
 					h.Cfg.Adapters.NodePool, client.ConditionTypeApplied, client.AdapterConditionStatusTrue))
 
@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 					ginkgo.GinkgoWriter.Printf("Warning: API delete failed for cluster %s: %v\n", clusterID, err)
 				}
 			}
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})

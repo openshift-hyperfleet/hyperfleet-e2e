@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Delete latency",
 				Expect(err).NotTo(HaveOccurred())
 				Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be set")
 				wifConfigIDs[i] = *wifConfig.Id
-				h.DeferWifConfigCleanup(*wifConfig.Id)
+				h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.Id)
 			}
 
 			helper.MeasureMedianLatency("DELETE /wifconfigs/{id}", config.ThresholdAPIDelete, len(wifConfigIDs),

@@ -66,9 +66,9 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 			})
 
 			baseDeployOpts = helper.AdapterDeploymentOptions{
-				Namespace:    h.Cfg.Namespace,
-				ChartPath:    adapterChartPath,
-				ResourceType: helper.ResourceTypeClusters,
+				Namespace: h.Cfg.Namespace,
+				ChartPath: adapterChartPath,
+				Entity:    h.Entities.MustGet("Cluster"),
 			}
 		})
 
@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 					_ = os.Unsetenv("ADAPTER_NAME")
 				})
 
-				releaseName := helper.GenerateAdapterReleaseName(helper.ResourceTypeClusters, adapterName)
+				releaseName := helper.GenerateAdapterReleaseName(h.Entities.MustGet("Cluster"), adapterName)
 
 				// Step 1a: Deploy dedicated crash-adapter
 				ginkgo.By("Deploy dedicated crash-adapter")
@@ -100,7 +100,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 
 					if h.Cfg.BrokerType == "googlepubsub" {
 						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, adapterName, deployOpts.ResourceType); err != nil {
+						if err := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); err != nil {
 							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
 						}
 					}
@@ -110,18 +110,18 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 
 				// Step 1b: Upgrade API to add crash-adapter to required adapters
 				ginkgo.By("Upgrade API to add crash-adapter to required adapters")
-				originalAdapters := h.GetAPIRequiredClusterAdapters()
+				originalAdapters := h.GetAPIRequiredAdapters(h.Entities.MustGet("Cluster"))
 				updatedAdapters := append(append([]string{}, originalAdapters...), adapterName)
 
 				// Register API config restore AFTER adapter cleanup registration (LIFO → executes FIRST)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Restore API required adapters to original config")
-					if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, apiChartPath, h.Cfg.Namespace, originalAdapters, 3); err != nil {
+					if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, originalAdapters, 3); err != nil {
 						ginkgo.GinkgoWriter.Printf("CRITICAL: %v\n", err)
 					}
 				})
 
-				err = h.UpgradeAPIRequiredAdapters(ctx, apiChartPath, h.Cfg.Namespace, updatedAdapters)
+				err = h.UpgradeAPIRequiredAdapters(ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, updatedAdapters)
 				Expect(err).NotTo(HaveOccurred(), "failed to upgrade API with crash-adapter in required adapters")
 
 				// Step 1c: Find deployment name and scale down to simulate crash
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Cleanup test cluster " + clusterID)
-					if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
 					}
 				})

@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Create latency",
 				func(int) {
 					wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
 					if wifConfig != nil && wifConfig.Id != nil {
-						h.DeferWifConfigCleanup(*wifConfig.Id)
+						h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.Id)
 					}
 					Expect(err).NotTo(HaveOccurred())
 					Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be set")

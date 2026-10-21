@@ -4,49 +4,30 @@ import (
 	"context"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 )
 
-// PollCluster returns a polling function for use with Eventually.
-func (h *Helper) PollCluster(ctx context.Context, id string) func() (*client.Resource, error) {
+// Poll returns a polling function for use with Eventually.
+func (h *Helper) Poll(ctx context.Context, entity descriptor.EntityDescriptor, parentID, resourceID string) func() (*client.Resource, error) {
+	path := entity.ResourcePath(parentID, resourceID)
 	return func() (*client.Resource, error) {
-		return h.Client.GetCluster(ctx, id)
+		return h.Client.GetResource(ctx, path)
 	}
 }
 
-// PollNodePool returns a polling function for use with Eventually.
-func (h *Helper) PollNodePool(ctx context.Context, clusterID, npID string) func() (*client.Resource, error) {
-	return func() (*client.Resource, error) {
-		return h.Client.GetNodePool(ctx, clusterID, npID)
-	}
-}
-
-// PollClusterAdapterStatuses returns a polling function for cluster adapter status checks.
-func (h *Helper) PollClusterAdapterStatuses(ctx context.Context, clusterID string) func() (*client.AdapterStatusList, error) {
+// PollAdapterStatuses returns a polling function for use with Eventually.
+func (h *Helper) PollAdapterStatuses(ctx context.Context, entity descriptor.EntityDescriptor, parentID, resourceID string) func() (*client.AdapterStatusList, error) {
+	path := entity.ResourcePath(parentID, resourceID)
 	return func() (*client.AdapterStatusList, error) {
-		return h.Client.GetClusterStatuses(ctx, clusterID)
+		return h.Client.GetResourceStatuses(ctx, path)
 	}
 }
 
-// PollNodePoolAdapterStatuses returns a polling function for nodepool adapter status checks.
-func (h *Helper) PollNodePoolAdapterStatuses(ctx context.Context, clusterID, npID string) func() (*client.AdapterStatusList, error) {
-	return func() (*client.AdapterStatusList, error) {
-		return h.Client.GetNodePoolStatuses(ctx, clusterID, npID)
-	}
-}
-
-// PollClusterHTTPStatus returns a polling function that yields the HTTP status code.
-// 200 when cluster exists, 404 when gone. Useful for hard-delete assertions.
-func (h *Helper) PollClusterHTTPStatus(ctx context.Context, id string) func() (int, error) {
+// PollHTTPStatus returns a polling function for use with Eventually.
+func (h *Helper) PollHTTPStatus(ctx context.Context, entity descriptor.EntityDescriptor, parentID, resourceID string) func() (int, error) {
+	path := entity.ResourcePath(parentID, resourceID)
 	return func() (int, error) {
-		return h.Client.GetResourceHTTPStatus(ctx, client.ClustersPath+"/"+id)
-	}
-}
-
-// PollNodePoolHTTPStatus returns a polling function that yields the HTTP status code.
-// 200 when nodepool exists, 404 when gone. Useful for hard-delete assertions.
-func (h *Helper) PollNodePoolHTTPStatus(ctx context.Context, clusterID, npID string) func() (int, error) {
-	return func() (int, error) {
-		return h.Client.GetResourceHTTPStatus(ctx, client.ClustersPath+"/"+clusterID+"/"+client.NodepoolsPath+"/"+npID)
+		return h.Client.GetResourceHTTPStatus(ctx, path)
 	}
 }
 

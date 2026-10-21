@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 			Expect(cluster.Id).NotTo(BeNil())
 			clusterID = *cluster.Id
 
-			Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 			Expect(patch3.Generation).To(Equal(int32(4)))
 
 			ginkgo.By("waiting for all adapters to reconcile at the final generation")
-			Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, int32(4)))
 
 			ginkgo.By("verifying cluster reaches Reconciled=True at final generation")
@@ -76,7 +76,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 				return
 			}
 			ginkgo.By("cleaning up cluster " + clusterID)
-			if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+			if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 				ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
 			}
 		})

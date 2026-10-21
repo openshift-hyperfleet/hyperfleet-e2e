@@ -17,6 +17,7 @@ import (
 	pubsubadmin "cloud.google.com/go/pubsub/v2/apiv1"
 	pubsubpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,9 +25,9 @@ import (
 )
 
 type AdapterDeployment struct {
-	ReleaseName  string
-	AdapterName  string
-	ResourceType string
+	ReleaseName    string
+	AdapterName    string
+	ResourcePlural string
 }
 
 type AdapterDeploymentList struct {
@@ -73,24 +74,24 @@ func generateRandomString(length int) string {
 
 // AdapterDeploymentOptions contains configuration for deploying an adapter via Helm
 type AdapterDeploymentOptions struct {
-	ReleaseName  string
-	Namespace    string
-	ChartPath    string
-	AdapterName  string
-	Timeout      time.Duration
-	SetValues    map[string]string // Additional Helm --set values
-	ResourceType string
+	ReleaseName string
+	Namespace   string
+	ChartPath   string
+	AdapterName string
+	Timeout     time.Duration
+	SetValues   map[string]string // Additional Helm --set values
+	Entity      descriptor.EntityDescriptor
 }
 
 // GenerateAdapterReleaseName generates a deterministic Helm release name for an adapter deployment.
-// The release name format is: adapter-<resource_type>-<adapter_name>
+// The release name format is: adapter-<plural>-<adapter_name>
 // Deterministic naming allows helm upgrade --install to upgrade in place and avoids duplicate releases.
 // The name is truncated to 48 characters to leave room for Helm's deployment/pod suffixes (Kubernetes has a 63-char limit).
 // If truncation is needed, a deterministic hash is appended to prevent collisions between long names.
 const maxReleaseNameLength = 48
 
-func GenerateAdapterReleaseName(resourceType, adapterName string) string {
-	releaseName := fmt.Sprintf("adapter-%s-%s", resourceType, adapterName)
+func GenerateAdapterReleaseName(entity descriptor.EntityDescriptor, adapterName string) string {
+	releaseName := fmt.Sprintf("adapter-%s-%s", entity.Plural, adapterName)
 
 	if len(releaseName) > maxReleaseNameLength {
 		hash := fmt.Sprintf("%x", sha256.Sum256([]byte(releaseName)))[:8]
@@ -247,9 +248,9 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 
 	// Add adapter deployment to list for cleanup
 	h.AdapterDeploymentList.Add(AdapterDeployment{
-		ReleaseName:  releaseName,
-		AdapterName:  opts.AdapterName,
-		ResourceType: opts.ResourceType,
+		ReleaseName:    releaseName,
+		AdapterName:    opts.AdapterName,
+		ResourcePlural: opts.Entity.Plural,
 	})
 
 	slog.Info("adapter deployed successfully",
@@ -610,7 +611,7 @@ var newPubSubDeleteFunc = func(ctx context.Context, projectID, subID string) (fu
 }
 
 // DeletePubSubResourcesForAdapter deletes Pub/Sub subscription and dlq topic for a given adapter.
-func (h *Helper) DeletePubSubResourcesForAdapter(ctx context.Context, adapterName string, resourceType string) error {
+func (h *Helper) DeletePubSubResourcesForAdapter(ctx context.Context, entity descriptor.EntityDescriptor, adapterName string) error {
 	if h.Cfg.BrokerType != "googlepubsub" {
 		slog.Info("skipping Pub/Sub subscription and topic deletion for non-Google Pub/Sub adapter", "adapter", adapterName)
 		return nil
@@ -618,8 +619,8 @@ func (h *Helper) DeletePubSubResourcesForAdapter(ctx context.Context, adapterNam
 
 	namespace := h.Cfg.Namespace
 	projectID := h.Cfg.GCPProjectID
-	subscriptionID := fmt.Sprintf("%s-%s-%s", namespace, resourceType, adapterName)
-	topicID := fmt.Sprintf("%s-%s-%s-dlq", namespace, resourceType, adapterName)
+	subscriptionID := fmt.Sprintf("%s-%s-%s", namespace, entity.Plural, adapterName)
+	topicID := fmt.Sprintf("%s-%s-%s-dlq", namespace, entity.Plural, adapterName)
 
 	var errorList []string
 	if err := DeletePubSubSubscription(ctx, subscriptionID, projectID); err != nil {

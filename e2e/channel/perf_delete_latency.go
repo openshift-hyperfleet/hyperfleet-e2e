@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Delete latency",
 				Expect(err).NotTo(HaveOccurred())
 				Expect(channel.Id).NotTo(BeNil(), "channel ID should be set")
 				channelIDs[i] = *channel.Id
-				h.DeferChannelCleanup(*channel.Id)
+				h.DeferCleanup(h.Entities.MustGet("Channel"), "", *channel.Id)
 			}
 
 			helper.MeasureMedianLatency("DELETE /channels/{id}", config.ThresholdAPIDelete, len(channelIDs),

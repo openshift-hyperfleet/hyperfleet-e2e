@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Create latency",
 				func(int) {
 					channel, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 					if channel != nil && channel.Id != nil {
-						h.DeferChannelCleanup(*channel.Id)
+						h.DeferCleanup(h.Entities.MustGet("Channel"), "", *channel.Id)
 					}
 					Expect(err).NotTo(HaveOccurred())
 					Expect(channel.Id).NotTo(BeNil(), "channel ID should be set")

@@ -25,11 +25,11 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Delete-to-hard-delete latency",
 			h = helper.New()
 
 			var err error
-			clusterID, err = h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestCluster(ctx, clusterID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
 				}
 			})
@@ -40,13 +40,13 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Delete-to-hard-delete latency",
 			nodepoolID = *nodepool.Id
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestNodePool(ctx, clusterID, nodepoolID); err != nil {
+				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID); err != nil {
 					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup nodepool %s: %v\n", nodepoolID, err)
 				}
 			})
 
 			ginkgo.By("waiting for nodepool to reach Reconciled before delete")
-			Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Delete-to-hard-delete latency",
 			_, err := h.Client.DeleteNodePool(ctx, clusterID, nodepoolID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollNodePoolHTTPStatus(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Deleted, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Deleted, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			elapsed := time.Since(start)

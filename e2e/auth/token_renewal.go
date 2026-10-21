@@ -35,9 +35,9 @@ var _ = ginkgo.Describe("[Suite: auth][renewal] JWT Token Renewal",
 				Expect(cluster.Id).NotTo(BeNil())
 				clusterID := *cluster.Id
 
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying cluster is at generation 1")
@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("[Suite: auth][renewal] JWT Token Renewal",
 				expectedGen := patched.Generation
 
 				ginkgo.By("waiting for all adapters to reconcile at new generation")
-				Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
 
 				ginkgo.By("verifying cluster reaches Reconciled at new generation")
@@ -80,12 +80,12 @@ var _ = ginkgo.Describe("[Suite: auth][renewal] JWT Token Renewal",
 		ginkgo.It("Adapter continues reporting status across token refresh boundary",
 			func(ctx context.Context) {
 				ginkgo.By("creating a cluster and waiting for initial Reconciled state")
-				clusterID, err := h.GetTestCluster(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.GetTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 				Expect(err).NotTo(HaveOccurred(), "cluster creation should succeed")
 
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying at least one adapter has reported")
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("[Suite: auth][renewal] JWT Token Renewal",
 				expectedGen := patched.Generation
 
 				ginkgo.By("waiting for adapters to report at new generation")
-				Eventually(h.PollClusterAdapterStatuses(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
 
 				ginkgo.By("verifying adapters successfully reported (proving token renewal worked)")

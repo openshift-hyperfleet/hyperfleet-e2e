@@ -32,9 +32,9 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				Expect(cluster.Id).NotTo(BeNil())
 				clusterID := *cluster.Id
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
-				h.DeferClusterCleanup(clusterID)
+				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
-				Eventually(h.PollCluster(ctx, clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("Create a nodepool and wait for Reconciled")
@@ -43,7 +43,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				Expect(np.Id).NotTo(BeNil())
 				nodepoolID := *np.Id
 
-				Eventually(h.PollNodePool(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				// --- Simulate stuck deletion by scaling down an existing cluster adapter ---
@@ -90,12 +90,12 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				Expect(err).NotTo(HaveOccurred(), "force-delete should succeed with 204")
 
 				ginkgo.By("Verify cluster is hard-deleted (404)")
-				Eventually(h.PollClusterHTTPStatus(ctx, clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
 					Should(Equal(http.StatusNotFound))
 
 				// Force-delete cascades: child nodepools are removed in the same transaction
 				ginkgo.By("Verify child nodepool is also removed (404)")
-				Eventually(h.PollNodePoolHTTPStatus(ctx, clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.GinkgoWriter.Printf("Verified: force-delete removed cluster %s and nodepool %s\n", clusterID, nodepoolID)

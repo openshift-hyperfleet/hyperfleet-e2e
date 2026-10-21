@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 	"gopkg.in/yaml.v3"
 
 	"log/slog"
 )
 
 const (
-	entityKindCluster  = "Cluster"
 	helmReleaseName    = "hyperfleet-api"
 	helmUpgradeTimeout = 3 * time.Minute
 	// Give the context headroom over helm's own --timeout so helm can
@@ -43,17 +43,17 @@ type apiEntity struct {
 }
 
 // UpgradeAPIRequiredAdapters upgrades the API Helm release to update the
-// required adapters for the Cluster entity. It reads the current Helm values,
+// required adapters for the given entity. It reads the current Helm values,
 // patches the correct entity by kind (not by array index), and applies.
-func (h *Helper) UpgradeAPIRequiredAdapters(ctx context.Context, apiChartPath, namespace string, clusterAdapters []string) error {
+func (h *Helper) UpgradeAPIRequiredAdapters(ctx context.Context, entity descriptor.EntityDescriptor, apiChartPath, namespace string, adapters []string) error {
 	slog.Info("upgrading API required adapters",
 		"namespace", namespace,
-		"cluster_adapters", clusterAdapters)
+		"kind", entity.Kind, "adapters", adapters)
 
 	cmdCtx, cancel := context.WithTimeout(ctx, helmContextTimeout)
 	defer cancel()
 
-	patchedBytes, err := getAndPatchHelmValues(cmdCtx, namespace, entityKindCluster, clusterAdapters)
+	patchedBytes, err := getAndPatchHelmValues(cmdCtx, namespace, entity.Kind, adapters)
 	if err != nil {
 		return err
 	}
@@ -93,16 +93,16 @@ func (h *Helper) UpgradeAPIRequiredAdapters(ctx context.Context, apiChartPath, n
 	}
 
 	slog.Info("API required adapters updated successfully",
-		"cluster_adapters", clusterAdapters,
+		"kind", entity.Kind, "adapters", adapters,
 		"output", string(output))
 
-	return h.waitForAPIReady(ctx)
+	return h.waitForAPIReady(ctx, entity)
 }
 
 // waitForAPIReady polls the API until it responds or the timeout expires.
 // Uses a plain ticker instead of gomega.Eventually so the function returns
 // an error instead of panicking through gomega's fail handler.
-func (h *Helper) waitForAPIReady(ctx context.Context) error {
+func (h *Helper) waitForAPIReady(ctx context.Context, entity descriptor.EntityDescriptor) error {
 	slog.Info("waiting for API to be reachable after rollout")
 
 	ticker := time.NewTicker(apiReadyInterval)
@@ -110,7 +110,7 @@ func (h *Helper) waitForAPIReady(ctx context.Context) error {
 	deadline := time.After(apiReadyTimeout)
 
 	for {
-		if _, err := h.Client.ListClusters(ctx); err == nil {
+		if _, err := h.Client.ListResources(ctx, entity.Plural, ""); err == nil {
 			slog.Info("API is reachable after rollout")
 			return nil
 		}
@@ -178,10 +178,10 @@ func patchEntityRequiredAdapters(vals *apiValues, kind string, adapters []string
 
 // RestoreAPIRequiredAdaptersWithRetry restores the API required adapters with retry logic.
 // This is designed for use in DeferCleanup to ensure API config is restored even on transient failures.
-func (h *Helper) RestoreAPIRequiredAdaptersWithRetry(ctx context.Context, apiChartPath, namespace string, originalAdapters []string, maxRetries int) error {
+func (h *Helper) RestoreAPIRequiredAdaptersWithRetry(ctx context.Context, entity descriptor.EntityDescriptor, apiChartPath, namespace string, originalAdapters []string, maxRetries int) error {
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		err := h.UpgradeAPIRequiredAdapters(ctx, apiChartPath, namespace, originalAdapters)
+		err := h.UpgradeAPIRequiredAdapters(ctx, entity, apiChartPath, namespace, originalAdapters)
 		if err == nil {
 			slog.Info("API config restored successfully", "attempt", attempt)
 			return nil
@@ -211,7 +211,8 @@ func (h *Helper) RestoreAPIRequiredAdaptersWithRetry(ctx context.Context, apiCha
 	return fmt.Errorf("failed to restore API config after %d retries: %w", maxRetries, lastErr)
 }
 
-// GetAPIRequiredClusterAdapters returns the current list of required cluster adapters from config.
-func (h *Helper) GetAPIRequiredClusterAdapters() []string {
-	return h.Cfg.Adapters.Cluster
+// GetAPIRequiredAdapters returns the descriptor's configured baseline, not the
+// live Helm/API state. Callers must copy it before making temporary changes.
+func (h *Helper) GetAPIRequiredAdapters(entity descriptor.EntityDescriptor) []string {
+	return entity.RequiredAdapters
 }
