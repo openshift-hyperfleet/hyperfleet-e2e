@@ -129,7 +129,9 @@ func (e EntityDescriptor) clone() EntityDescriptor {
 	return e
 }
 
-// Validate checks routing metadata and settings required by the cleanup policy.
+// Validate checks routing metadata and the runtime settings the entity is waited
+// on with: timeouts are not negative, required adapters come with a reconciled
+// timeout, and waiting for hard-delete comes with a deleted timeout.
 func (e EntityDescriptor) Validate() error {
 	if strings.TrimSpace(e.Kind) == "" || !validSegment(e.Plural) {
 		return fmt.Errorf("entity kind and a valid plural are required: %q/%q", e.Kind, e.Plural)
@@ -140,6 +142,12 @@ func (e EntityDescriptor) Validate() error {
 		}
 	} else if !validSegment(e.ParentPlural) || (e.OnParentDelete != "cascade" && e.OnParentDelete != "restrict") {
 		return fmt.Errorf("entity %q requires a parent plural and cascade/restrict deletion policy", e.Kind)
+	}
+	if e.Timeouts.Reconciled < 0 || e.Timeouts.Deleted < 0 {
+		return fmt.Errorf("entity %q timeouts must not be negative, got %+v", e.Kind, e.Timeouts)
+	}
+	if len(e.RequiredAdapters) > 0 && e.Timeouts.Reconciled == 0 {
+		return fmt.Errorf("entity %q has required adapters but no reconciled timeout", e.Kind)
 	}
 	if e.Cleanup.WaitForHardDelete && e.Timeouts.Deleted <= 0 {
 		return fmt.Errorf("entity %q requires a positive deleted timeout when waiting for hard-delete, got %s", e.Kind, e.Timeouts.Deleted)

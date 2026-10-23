@@ -60,7 +60,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 						}
 
 						// Validate each required adapter from config
-						for _, requiredAdapter := range h.Cfg.Adapters.NodePool {
+						for _, requiredAdapter := range h.Entities.MustGet("NodePool").RequiredAdapters {
 							adapter, exists := adapterMap[requiredAdapter]
 							g.Expect(exists).To(BeTrue(),
 								"required adapter %s should be present in adapter statuses", requiredAdapter)
@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					ginkgo.By("Verify final nodepool state")
 					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the nodepool has reached the desired end state
-					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					finalNodePool, err := h.Client.GetNodePool(ctx, clusterID, nodepoolID)
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					// Validate adapter-specific conditions in nodepool status
 					// Each required adapter should report its own condition type (e.g., NpConfigmapSuccessful)
 					// Note: This check will be removed once these adapter-specific conditions are removed in the future
-					for _, adapterName := range h.Cfg.Adapters.NodePool {
+					for _, adapterName := range h.Entities.MustGet("NodePool").RequiredAdapters {
 						expectedCondType := h.AdapterNameToConditionType(adapterName)
 						hasAdapterCondition := h.HasResourceCondition(
 							finalNodePool.Status.Conditions,
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					}
 
 					// Verify K8s resources for each configured adapter using Eventually
-					for _, adapterName := range h.Cfg.Adapters.NodePool {
+					for _, adapterName := range h.Entities.MustGet("NodePool").RequiredAdapters {
 						verifier, exists := adapterResourceVerifiers[adapterName]
 						if !exists {
 							ginkgo.Fail(fmt.Sprintf("No K8s resource verifier defined for adapter %s - test configuration error", adapterName))
@@ -206,7 +206,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the nodepool workflow completed successfully and all K8s resources were created
 					// Without this, adapters may still be creating resources during cleanup
-					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 				})
 		})

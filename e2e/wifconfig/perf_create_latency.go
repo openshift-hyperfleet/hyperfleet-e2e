@@ -6,7 +6,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -22,7 +21,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Create latency",
 		})
 
 		ginkgo.It("should create a wifconfig within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /wifconfigs", config.ThresholdAPICreate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("POST /wifconfigs", h.Entities.MustGet("WifConfig").Thresholds.Create, helper.DefaultSamples,
 				func(int) {
 					wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
 					if wifConfig != nil && wifConfig.Id != nil {

@@ -754,7 +754,7 @@ curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
 #### Step 4: Wait and verify cluster remains stuck in soft-deleted state
 
 **Action:**
-- Wait for `2 * h.Cfg.Timeouts.Cluster.Reconciled` to allow healthy adapters to finalize
+- Wait for `2 * h.Entities.MustGet("Cluster").Timeouts.Reconciled` to allow healthy adapters to finalize
 - Poll cluster status periodically:
 ```bash
 curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}
@@ -1448,7 +1448,7 @@ curl -X POST ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/nodepools \
 #### Step 2: Scale down an existing cluster adapter and soft-delete the cluster
 
 **Action:**
-- Scale the pre-deployed cluster adapter (`Adapters.Cluster[0]`) to 0 replicas to simulate unavailability
+- Scale the pre-deployed cluster adapter (`h.Entities.MustGet("Cluster").RequiredAdapters[0]`) to 0 replicas to simulate unavailability
 - Send DELETE request for the cluster:
 ```bash
 curl -X DELETE ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}

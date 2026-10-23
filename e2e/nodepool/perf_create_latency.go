@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -48,12 +47,12 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Create-to-reconciled latency",
 				}
 			})
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			elapsed := time.Since(start)
 			ginkgo.GinkgoWriter.Printf("[PERF] NodePool create-to-reconciled latency: %v\n", elapsed)
-			Expect(elapsed).To(BeNumerically("<", config.ThresholdNodePoolCreateReconciled),
+			Expect(elapsed).To(BeNumerically("<", h.Entities.MustGet("NodePool").Thresholds.CreateReconciled),
 				"nodepool create-to-reconciled exceeded threshold")
 		})
 	},

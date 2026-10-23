@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -35,7 +34,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Delete-to-hard-delete latency",
 			})
 
 			ginkgo.By("waiting for cluster to reach Reconciled before delete")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -46,12 +45,12 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Delete-to-hard-delete latency",
 			_, err := h.Client.DeleteCluster(ctx, clusterID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			elapsed := time.Since(start)
 			ginkgo.GinkgoWriter.Printf("[PERF] Cluster delete-to-hard-delete latency: %v\n", elapsed)
-			Expect(elapsed).To(BeNumerically("<", config.ThresholdClusterDeleted),
+			Expect(elapsed).To(BeNumerically("<", h.Entities.MustGet("Cluster").Thresholds.Deleted),
 				"cluster delete-to-hard-delete exceeded threshold")
 		})
 	},

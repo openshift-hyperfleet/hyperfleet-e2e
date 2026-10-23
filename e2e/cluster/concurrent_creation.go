@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				ginkgo.By("Wait for all clusters to reach Reconciled=True and Available=True")
 				for i, clusterID := range clusterIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for cluster %d (%s) to become Reconciled...\n", i, clusterID)
-					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					cluster, err := h.Client.GetCluster(ctx, clusterID)
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 						}
 
 						// Verify each required adapter has completed successfully
-						for _, requiredAdapter := range h.Cfg.Adapters.Cluster {
+						for _, requiredAdapter := range h.Entities.MustGet("Cluster").RequiredAdapters {
 							adapter, exists := adapterMap[requiredAdapter]
 							g.Expect(exists).To(BeTrue(),
 								"cluster %d (%s): required adapter %s should be present", i, clusterID, requiredAdapter)

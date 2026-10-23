@@ -32,7 +32,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] NodePool Update Lifecycle",
 				}
 			})
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("creating nodepool and waiting for Reconciled at generation 1")
@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] NodePool Update Lifecycle",
 			Expect(np.Id).NotTo(BeNil(), "nodepool ID should be generated")
 			nodepoolID = *np.Id
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] NodePool Update Lifecycle",
 
 			ginkgo.By("waiting for all nodepool adapters to reconcile at new generation")
 			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.NodePool, expectedGen))
+				Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("NodePool").RequiredAdapters, expectedGen))
 
 			ginkgo.By("verifying nodepool reaches Reconciled=True at new generation")
 			Eventually(func(g Gomega) {
@@ -80,7 +80,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][update] NodePool Update Lifecycle",
 					}
 				}
 				g.Expect(found).To(BeTrue(), "nodepool should have Reconciled=True")
-			}, h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+			}, h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 
 			ginkgo.By("verifying parent cluster generation is unchanged")
 			parentCluster, err := h.Client.GetCluster(ctx, clusterID)

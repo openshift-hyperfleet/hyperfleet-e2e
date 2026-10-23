@@ -6,7 +6,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -31,7 +30,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Delete latency",
 				h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.Id)
 			}
 
-			helper.MeasureMedianLatency("DELETE /wifconfigs/{id}", config.ThresholdAPIDelete, len(wifConfigIDs),
+			helper.MeasureMedianLatency("DELETE /wifconfigs/{id}", h.Entities.MustGet("WifConfig").Thresholds.Delete, len(wifConfigIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteWifConfig(ctx, wifConfigIDs[i])
 					Expect(err).NotTo(HaveOccurred())

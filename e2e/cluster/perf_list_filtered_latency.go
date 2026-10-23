@@ -7,7 +7,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -36,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API list latency with filters an
 
 		ginkgo.It("should list clusters with search filter within acceptable latency", func(ctx context.Context) {
 			filter := "labels.environment='test'"
-			helper.MeasureMedianLatency("GET /clusters (search filter)", config.ThresholdAPIList, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /clusters (search filter)", h.Entities.MustGet("Cluster").Thresholds.List, helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListClustersWithParams(ctx, url.Values{"search": {filter}})
 					Expect(err).NotTo(HaveOccurred())
@@ -45,7 +44,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API list latency with filters an
 		})
 
 		ginkgo.It("should list clusters with page size limit within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /clusters (size=10)", config.ThresholdAPIList, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /clusters (size=10)", h.Entities.MustGet("Cluster").Thresholds.List, helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListClustersWithParams(ctx, url.Values{"size": {"10"}})
 					Expect(err).NotTo(HaveOccurred())
@@ -54,7 +53,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API list latency with filters an
 		})
 
 		ginkgo.It("should list clusters with pagination within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /clusters (page=1, size=10)", config.ThresholdAPIList, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /clusters (page=1, size=10)", h.Entities.MustGet("Cluster").Thresholds.List, helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListClustersWithParams(ctx, url.Values{"page": {"1"}, "size": {"10"}})
 					Expect(err).NotTo(HaveOccurred())

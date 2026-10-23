@@ -6,7 +6,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -22,7 +21,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Create latency",
 		})
 
 		ginkgo.It("should create a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /channels", config.ThresholdAPICreate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("POST /channels", h.Entities.MustGet("Channel").Thresholds.Create, helper.DefaultSamples,
 				func(int) {
 					channel, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 					if channel != nil && channel.Id != nil {

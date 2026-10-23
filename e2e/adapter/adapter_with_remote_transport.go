@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 			adapter = h.Cfg.Desire.Adapter
 			// The tier suites check only the adapters in adapters.cluster. Requiring the
 			// remote adapter there keeps them from silently dropping the remote path.
-			Expect(h.Cfg.Adapters.Cluster).To(ContainElement(adapter),
+			Expect(h.Entities.MustGet("Cluster").RequiredAdapters).To(ContainElement(adapter),
 				"adapters.cluster must include the remote adapter %q (desire.adapter)", adapter)
 
 			// Registered here rather than in the create spec: in an Ordered container a
@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				ginkgo.By("waiting for the cluster to become Reconciled")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying the remote adapter reports Applied, Available and Health True at the cluster generation")
@@ -197,7 +197,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				// Hard-delete runs inside the status POST that computes Reconciled=True from
 				// the required adapters' Finalized=True, so the 404 proves the adapter
 				// finalized; Finalized=True itself may never be observable.
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.By("checking once, without retry, that the remote Namespace is gone")

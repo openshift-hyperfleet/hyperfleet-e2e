@@ -62,7 +62,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 						}
 
 						// Validate each required adapter from config
-						for _, requiredAdapter := range h.Cfg.Adapters.Cluster {
+						for _, requiredAdapter := range h.Entities.MustGet("Cluster").RequiredAdapters {
 							adapter, exists := adapterMap[requiredAdapter]
 							g.Expect(exists).To(BeTrue(),
 								"required adapter %s should be present in adapter statuses", requiredAdapter)
@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					ginkgo.By("Verify final cluster state")
 					// Wait for cluster Reconciled condition and verify both Reconciled and Available conditions are True
 					// This confirms the cluster has reached the desired end state
-					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					finalCluster, err := h.Client.GetCluster(ctx, clusterID)
@@ -148,7 +148,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 
 					// Validate adapter-specific conditions in cluster status
 					// Each required adapter should report its own condition type (e.g., ClNamespaceSuccessful, ClJobSuccessful)
-					for _, adapterName := range h.Cfg.Adapters.Cluster {
+					for _, adapterName := range h.Entities.MustGet("Cluster").RequiredAdapters {
 						expectedCondType := h.AdapterNameToConditionType(adapterName)
 						hasAdapterCondition := h.HasResourceCondition(
 							finalCluster.Status.Conditions,
@@ -226,7 +226,7 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					ginkgo.By("Verify final cluster state to ensure Reconciled before cleanup")
 					// Wait for cluster Reconciled condition to prevent namespace deletion conflicts
 					// Without this, adapters may still be creating resources during cleanup
-					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 				})
 		})

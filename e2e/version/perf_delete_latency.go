@@ -6,7 +6,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -44,7 +43,7 @@ var _ = ginkgo.Describe("[Suite: version][perf] Delete latency",
 				versionIDs[i] = *version.Id
 			}
 
-			helper.MeasureMedianLatency("DELETE /channels/{parent_id}/versions/{id}", config.ThresholdAPINestedWrite, len(versionIDs),
+			helper.MeasureMedianLatency("DELETE /channels/{parent_id}/versions/{id}", h.Entities.MustGet("Version").Thresholds.Delete, len(versionIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteVersion(ctx, channelID, versionIDs[i])
 					Expect(err).NotTo(HaveOccurred())

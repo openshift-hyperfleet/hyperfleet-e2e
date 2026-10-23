@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][delete-restrict] WIF Config Deletion
 			Expect(err).NotTo(HaveOccurred(), "failed to delete cluster")
 
 			ginkgo.By("waiting for cluster hard-delete")
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound), "cluster should be hard-deleted")
 
 			ginkgo.By("deleting the wifconfig after cluster is gone")

@@ -50,7 +50,7 @@ api:
   url: https://api.hyperfleet.example.com
 timeouts:
   cluster:
-    reconciled: 5m   # Default: 30m (see pkg/config/defaults.go)
+    reconciled: 5m   # Example override; the default is defaultEntityTimeouts in pkg/config/descriptor.go
 ```
 
 ### pkg/config
@@ -149,18 +149,48 @@ path from their parent's plural. Resolve a known kind with
 
 The catalog is built after configuration has been resolved. `pkg/descriptor`
 owns the type, catalog and path construction, with no config or helper imports.
-The single table is `Config.entityDescriptors` in `pkg/config/descriptor.go`.
-Each row combines routing, cleanup and runtime settings; production rows read the
-existing resolved config fields and threshold constants directly. There is no
-second kind switch to update when adding a row.
+The single table is `EntityDescriptors` in `pkg/config/descriptor.go`. Each row
+combines routing, cleanup and the default runtime settings: required adapters,
+`Timeouts` and perf `Thresholds`. There is no second kind switch, config field,
+default constant or env alias to update when adding a row. Nested paths are
+derived from parent plural, parent ID and plural.
 
-Fixture rows register routing and cleanup metadata. `Parent` and `CascadeChild`
-use a shared two-minute deletion timeout. The catalog rejects any row with
-`Cleanup.WaitForHardDelete` and a zero or negative `Timeouts.Deleted`, so invalid
-cleanup settings fail when the helper is constructed, before it creates resources.
-Rows that do not wait for hard-delete can leave that timeout unset. Fixture
-adapters, reconciliation timeouts and performance thresholds remain unset;
-registration alone does not deploy fixtures or establish performance baselines.
+`config.Load()` overlays the kind-keyed config on the row defaults, builds and
+validates the catalog once, and stores it in `Config.Entities`; `helper.New()`
+uses the same catalog. Config keys are the kind in lower case, env vars the kind
+in upper case:
+
+- `adapters.<kind>` or `HYPERFLEET_ADAPTERS_<KIND>` (comma- or space-separated) replaces the
+  row's adapter list. Blank names are dropped, and the list must name at least
+  one adapter; remove the key to keep the default. `API_ADAPTERS_CLUSTER` and `API_ADAPTERS_NODEPOOL` are
+  aliases for the cluster and nodepool keys until the per-kind suites go.
+- `timeouts.<kind>.reconciled` / `.deleted`, or
+  `HYPERFLEET_TIMEOUTS_<KIND>_RECONCILED` / `_DELETED`, replaces one field; a
+  missing or zero value keeps the row default. Values decode like every other
+  duration in the config: a value needs a unit (`90s`, `5m`), and a bare YAML
+  number other than zero fails. The keys `TimeoutsConfig` owns, such as `timeouts.adapter.processing`,
+  are shared, not per kind.
+- Thresholds are code in the row and have no config key.
+
+`Load()` fails before the suite starts on a YAML key that names no table kind
+(for example the typo `timeouts.nodepools`), an unknown field under
+`timeouts.<kind>`, a scalar or list where a map belongs (such as
+`timeouts.cluster: 5m`), a timeout that is not a duration (such as `"300"` or `300`, with
+no unit), and an empty adapter list. A bare number fails for the shared durations too, such as
+`polling.interval`. Env vars
+for an unknown kind are not checked. `descriptor.NewCatalog` then checks each
+row (`EntityDescriptor.Validate`), so `Load()` also fails on a negative timeout
+or a row with adapters and no reconciled timeout. A row that waits for
+hard-delete needs a positive deleted timeout, but config cannot remove one, so
+only a table row can fail that check. Startup logs
+`adapters_<kind>`, `timeout_<kind>_reconciled` and `timeout_<kind>_deleted` for
+each row with adapters or timeouts in the "Loaded configuration" entry.
+
+Fixture rows register routing and cleanup metadata. Parent and CascadeChild wait
+for hard-delete, so they default to the Cluster timeouts; their adapters and the
+fixture thresholds are unset until the fixture adapters are deployed and
+baselined. They are not runnable E2E fixtures yet; registration does not contact
+an API route or establish performance baselines.
 
 Cleanup policy preserves existing behavior: Cluster and NodePool wait for 404,
 Channel explicitly deletes eligible Versions before itself, and WifConfig still

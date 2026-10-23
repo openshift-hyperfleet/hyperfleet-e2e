@@ -35,23 +35,9 @@ const (
 	LogOutputStderr = "stderr"
 )
 
-// Default timeout values
+// Default timeout values. Per-kind reconciled and deleted timeouts are row
+// defaults in the descriptor table (descriptor.go).
 const (
-	// DefaultClusterReconciledTimeout is the default timeout for waiting for a cluster to become reconciled
-	DefaultClusterReconciledTimeout = 2 * time.Minute
-
-	// DefaultClusterDeletedTimeout is the default timeout for waiting for a cluster to be hard-deleted (404)
-	DefaultClusterDeletedTimeout = 2 * time.Minute
-
-	// DefaultNodePoolReconciledTimeout is the default timeout for waiting for a nodepool to become reconciled
-	DefaultNodePoolReconciledTimeout = 5 * time.Minute
-
-	// DefaultNodePoolDeletedTimeout is the default timeout for waiting for a nodepool to be hard-deleted (404)
-	DefaultNodePoolDeletedTimeout = 2 * time.Minute
-
-	// DefaultFixtureDeletedTimeout is the shared hard-delete timeout for fixture kinds.
-	DefaultFixtureDeletedTimeout = 2 * time.Minute
-
 	// DefaultAdapterProcessingTimeout is the default timeout for waiting for adapter conditions
 	DefaultAdapterProcessingTimeout = 5 * time.Minute
 
@@ -76,23 +62,8 @@ const (
 	// DefaultHyperfleetAPIBaseURL is the in-cluster base URL for the HyperFleet API.
 	DefaultHyperfleetAPIBaseURL = "http://hyperfleet-gateway:8000"
 
-	// DefaultDesireAdapter is the remote-transport cluster adapter hyperfleet-infra deploys; it is one of adapters.cluster
+	// DefaultDesireAdapter is the remote-transport cluster adapter hyperfleet-infra deploys; it is one of the Cluster row's required adapters
 	DefaultDesireAdapter = "cl-desire"
-)
-
-// Default required adapters for resource types
-var (
-	// DefaultClusterAdapters is the default list of required adapters for cluster resources
-	DefaultClusterAdapters = []string{
-		"clusters-namespace",
-		"clusters-job",
-		"clusters-deployment",
-	}
-
-	// DefaultNodePoolAdapters is the default list of required adapters for nodepool resources
-	DefaultNodePoolAdapters = []string{
-		"nodepools-configmap",
-	}
 
 	// DefaultBrokerType is the default broker type
 	DefaultBrokerType = "googlepubsub"

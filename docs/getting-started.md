@@ -133,6 +133,8 @@ curl -f -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/
 HYPERFLEET_TIMEOUTS_CLUSTER_RECONCILED=45m make e2e
 ```
 
+The same shape works for any descriptor kind, upper-cased in the variable name: `HYPERFLEET_TIMEOUTS_<KIND>_RECONCILED` and `HYPERFLEET_TIMEOUTS_<KIND>_DELETED` (for example `HYPERFLEET_TIMEOUTS_NODEPOOL_DELETED`).
+
 **Namespace mismatch**: Ensure `NAMESPACE` matches your deployment namespace. Some tests deploy adapters dynamically and must target the same namespace where HyperFleet components are running.
 
 **Configuration not taking effect**:

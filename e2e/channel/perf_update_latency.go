@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -36,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Update latency",
 		})
 
 		ginkgo.It("should update a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("PATCH /channels/{id}", config.ThresholdAPIUpdate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("PATCH /channels/{id}", h.Entities.MustGet("Channel").Thresholds.Update, helper.DefaultSamples,
 				func(i int) {
 					_, err := h.Client.PatchChannel(ctx, channelID, client.ResourcePatchRequest{
 						Spec: map[string]any{

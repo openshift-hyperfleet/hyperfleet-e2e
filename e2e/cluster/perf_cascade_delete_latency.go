@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -36,7 +35,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Cascade delete-to-hard-delete la
 			})
 
 			ginkgo.By("waiting for cluster to reach Reconciled")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("creating a nodepool on the cluster")
@@ -52,7 +51,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Cascade delete-to-hard-delete la
 			})
 
 			ginkgo.By("waiting for nodepool to reach Reconciled")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -63,12 +62,12 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Cascade delete-to-hard-delete la
 			_, err := h.Client.DeleteCluster(ctx, clusterID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Deleted, h.Cfg.Polling.Interval).
+			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
 				Should(Equal(http.StatusNotFound))
 
 			elapsed := time.Since(start)
 			ginkgo.GinkgoWriter.Printf("[PERF] Cluster cascade delete-to-hard-delete latency: %v\n", elapsed)
-			Expect(elapsed).To(BeNumerically("<", config.ThresholdClusterCascadeDeleted),
+			Expect(elapsed).To(BeNumerically("<", h.Entities.MustGet("Cluster").Thresholds.CascadeDeleted),
 				"cluster cascade delete-to-hard-delete exceeded threshold")
 		})
 	},

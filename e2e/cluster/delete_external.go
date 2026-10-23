@@ -31,7 +31,7 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] External K8s Resource Deletion
 			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("confirming managed K8s namespaces exist")
@@ -99,9 +99,9 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] External K8s Resource Deletion
 				}
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(statuses).To(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.Cluster, client.ConditionTypeFinalized, client.AdapterConditionStatusTrue))
+					h.Entities.MustGet("Cluster").RequiredAdapters, client.ConditionTypeFinalized, client.AdapterConditionStatusTrue))
 				g.Expect(statuses).To(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.Cluster, client.ConditionTypeHealth, client.AdapterConditionStatusTrue))
+					h.Entities.MustGet("Cluster").RequiredAdapters, client.ConditionTypeHealth, client.AdapterConditionStatusTrue))
 			}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 
 			ginkgo.By("verifying cluster is hard-deleted")

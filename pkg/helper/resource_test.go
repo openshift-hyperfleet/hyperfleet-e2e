@@ -28,17 +28,17 @@ func newResourceTestHelper(t *testing.T, handler http.HandlerFunc) *Helper {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := &config.Config{
-		Polling: config.PollingConfig{Interval: time.Millisecond},
-		Timeouts: config.TimeoutsConfig{
-			Cluster:  config.ClusterTimeouts{Deleted: time.Second},
-			NodePool: config.NodePoolTimeouts{Deleted: time.Second},
-		},
+	rows := config.EntityDescriptors()
+	for i := range rows {
+		if rows[i].Kind == "Cluster" || rows[i].Kind == "NodePool" {
+			rows[i].Timeouts.Deleted = time.Second
+		}
 	}
-	entities, err := cfg.EntityCatalog()
+	entities, err := descriptor.NewCatalog(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cfg := &config.Config{Polling: config.PollingConfig{Interval: time.Millisecond}, Entities: entities}
 	return &Helper{Cfg: cfg, Client: cl, Entities: entities}
 }
 

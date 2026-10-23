@@ -131,7 +131,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
 						client.ConditionTypeLastKnownReconciled, client.ResourceConditionStatusTrue)).To(BeTrue(),
 						"cluster LastKnownReconciled should become True despite non-required adapter failure")
-				}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+				}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 
 				// Step 4: Verify adapter status is absent — required param extraction failure
 				// causes early return in executor (before post_actions), so no status is reported.

@@ -10,7 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
+
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 )
 
 const (
@@ -164,12 +167,6 @@ var Desire = struct {
 	Adapter: "desire.adapter",
 }
 
-// AdaptersConfig contains required adapters for each resource type
-type AdaptersConfig struct {
-	Cluster  []string `yaml:"cluster" mapstructure:"cluster"`   // Required adapters for cluster resources
-	NodePool []string `yaml:"nodepool" mapstructure:"nodepool"` // Required adapters for nodepool resources
-}
-
 // AdapterDeploymentConfig contains configuration for deploying adapters via Helm in tests.
 type AdapterDeploymentConfig struct {
 	ChartRepo     string `yaml:"chartRepo" mapstructure:"chartRepo"`
@@ -226,9 +223,9 @@ func (c *IdentityConfig) SetToken(t string) {
 // (adapter -> desire store -> applier).
 type DesireConfig struct {
 	// Adapter is the name of the cluster adapter that delivers on a remote transport.
-	// It is one of Adapters.Cluster, so the tier suites check it like any other required
-	// adapter; the remote-transport suite asserts that and uses this name to read the
-	// adapter's status and the objects the applier wrote for it.
+	// It is one of the Cluster row's required adapters, so the tier suites check it like any
+	// other required adapter; the remote-transport suite asserts that and uses this name to
+	// read the adapter's status and the objects the applier wrote for it.
 	// The default matches the name hyperfleet-infra gives the adapter; change it only when
 	// the stack deploys the adapter under another name.
 	Adapter string `yaml:"adapter" mapstructure:"adapter"`
@@ -246,12 +243,15 @@ type Config struct {
 	Timeouts          TimeoutsConfig          `yaml:"timeouts" mapstructure:"timeouts"`
 	Polling           PollingConfig           `yaml:"polling" mapstructure:"polling"`
 	Log               LogConfig               `yaml:"log" mapstructure:"log"`
-	Adapters          AdaptersConfig          `yaml:"adapters" mapstructure:"adapters"`
 	AdapterDeployment AdapterDeploymentConfig `yaml:"adapterDeployment" mapstructure:"adapterDeployment"`
 	APIDeployment     APIDeploymentConfig     `yaml:"apiDeployment" mapstructure:"apiDeployment"`
 	BrokerType        string                  `yaml:"brokerType" mapstructure:"brokerType"`
 	Identity          IdentityConfig          `yaml:"identity" mapstructure:"identity"`
 	Desire            DesireConfig            `yaml:"desire" mapstructure:"desire"`
+
+	// Entities is the descriptor catalog with the adapters.<kind> and timeouts.<kind>
+	// config overlaid, built and validated once by Load.
+	Entities *descriptor.Catalog `yaml:"-" mapstructure:"-"`
 }
 
 // MachineAuthorizationScheme returns the Authorization scheme for Kubernetes ServiceAccount tokens.
@@ -277,23 +277,10 @@ type APIConfig struct {
 	URL string `yaml:"url" mapstructure:"url"`
 }
 
-// TimeoutsConfig contains timeout configurations
+// TimeoutsConfig contains the shared timeouts. Every other key under timeouts
+// is a lower-case kind, which Load overlays on the descriptor row (see Entities).
 type TimeoutsConfig struct {
-	Cluster  ClusterTimeouts  `yaml:"cluster" mapstructure:"cluster"`
-	NodePool NodePoolTimeouts `yaml:"nodepool" mapstructure:"nodepool"`
-	Adapter  AdapterTimeouts  `yaml:"adapter" mapstructure:"adapter"`
-}
-
-// ClusterTimeouts contains cluster-related timeouts
-type ClusterTimeouts struct {
-	Reconciled time.Duration `yaml:"reconciled" mapstructure:"reconciled"`
-	Deleted    time.Duration `yaml:"deleted" mapstructure:"deleted"`
-}
-
-// NodePoolTimeouts contains nodepool-related timeouts
-type NodePoolTimeouts struct {
-	Reconciled time.Duration `yaml:"reconciled" mapstructure:"reconciled"`
-	Deleted    time.Duration `yaml:"deleted" mapstructure:"deleted"`
+	Adapter AdapterTimeouts `yaml:"adapter" mapstructure:"adapter"`
 }
 
 // AdapterTimeouts contains adapter-related timeouts
@@ -320,13 +307,15 @@ func Load() (*Config, error) {
 	// Use Unmarshal (not UnmarshalExact) to allow runtime test parameters (tests.*)
 	// to coexist with persistent configuration. Test parameters (label-filter, focus, skip)
 	// are set via flags/env vars and should not appear in config files.
-	if err := viper.Unmarshal(cfg); err != nil {
+	if err := viper.Unmarshal(cfg, rejectBareDurations); err != nil {
 		return nil, fmt.Errorf("configuration error: %w\nPlease check your config file", err)
 	}
 
-	// WORKAROUND: viper.Unmarshal doesn't always respect env var bindings for nested structs
-	// Use reflection to automatically apply all values from viper to the config struct
-	applyViperValues(reflect.ValueOf(cfg).Elem(), "")
+	entities, err := loadEntityCatalog()
+	if err != nil {
+		return nil, fmt.Errorf("loading entity catalog failed: %w", err)
+	}
+	cfg.Entities = entities
 
 	// Apply defaults
 	cfg.applyDefaults()
@@ -347,112 +336,56 @@ func IsDryRun() bool {
 	return viper.GetBool(Tests.GinkgoDryRun)
 }
 
-// applyViperValues recursively applies values from viper to the config struct using reflection
-// This ensures environment variables and flags properly override config file values
-func applyViperValues(v reflect.Value, prefix string) {
-	t := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldType := t.Field(i)
-
-		tag := fieldType.Tag.Get(TagMapstructure)
-		if tag == "" {
-			continue
-		}
-
-		var configPath string
-		if prefix == "" {
-			configPath = tag
-		} else {
-			configPath = prefix + "." + tag
-		}
-
-		if field.Kind() == reflect.Struct && field.Type() != reflect.TypeOf(time.Duration(0)) {
-			applyViperValues(field, configPath)
-			continue
-		}
-
-		if !field.CanSet() {
-			continue
-		}
-
-		// Apply value from viper based on field type
-		switch field.Kind() {
-		case reflect.String:
-			if viperVal := viper.GetString(configPath); viperVal != "" {
-				field.SetString(viperVal)
+// rejectBareDurations makes a non-zero number fail where a duration belongs, as a
+// string without a unit already does. Viper would decode YAML interval: 300 as
+// 300ns. Zero stays allowed, since it keeps a default. It runs before viper's own
+// hooks, which parse duration strings.
+func rejectBareDurations(c *mapstructure.DecoderConfig) {
+	durationType := reflect.TypeFor[time.Duration]()
+	c.DecodeHook = mapstructure.ComposeDecodeHookFunc(
+		func(from, to reflect.Type, data any) (any, error) {
+			if to != durationType || from == durationType {
+				return data, nil
 			}
-		case reflect.Bool:
-			// For bool, only apply if the key is explicitly set in viper
-			// This preserves the priority order: flags > env > config > defaults
-			if viper.IsSet(configPath) {
-				field.SetBool(viper.GetBool(configPath))
-			}
-		case reflect.Pointer:
-			// *bool distinguishes "unset" (nil, default applies) from an explicit false
-			if field.Type().Elem().Kind() == reflect.Bool && viper.IsSet(configPath) {
-				field.Set(reflect.ValueOf(new(viper.GetBool(configPath))))
-			}
-		case reflect.Slice:
-			// Handle string slices
-			if field.Type().Elem().Kind() == reflect.String {
-				if viper.IsSet(configPath) {
-					viperVal := viper.GetStringSlice(configPath)
-					if len(viperVal) == 1 && strings.Contains(viperVal[0], ",") {
-						viperVal = strings.Split(viperVal[0], ",")
-						// Trim whitespace from each element
-						for i := range viperVal {
-							viperVal[i] = strings.TrimSpace(viperVal[i])
-						}
-					}
-					if len(viperVal) > 0 {
-						field.Set(reflect.ValueOf(viperVal))
-					}
+			switch from.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+				reflect.Float32, reflect.Float64:
+				if !reflect.ValueOf(data).IsZero() {
+					return nil, fmt.Errorf("duration %v has no unit; write it with one, such as %vs", data, data)
 				}
 			}
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			// Special handling for time.Duration (which is int64)
-			if field.Type() == reflect.TypeOf(time.Duration(0)) {
-				if viperVal := viper.GetDuration(configPath); viperVal != 0 {
-					field.SetInt(int64(viperVal))
-				}
-			} else {
-				if viperVal := viper.GetInt64(configPath); viperVal != 0 {
-					field.SetInt(viperVal)
-				}
-			}
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			if viperVal := viper.GetUint64(configPath); viperVal != 0 {
-				field.SetUint(viperVal)
-			}
-		case reflect.Float32, reflect.Float64:
-			if viperVal := viper.GetFloat64(configPath); viperVal != 0 {
-				field.SetFloat(viperVal)
-			}
-		}
-	}
+			return data, nil
+		},
+		c.DecodeHook,
+	)
 }
 
-// applyDefaults applies default values for unset fields
+// BindEnvVars makes viper read HYPERFLEET_* env vars: api.url -> HYPERFLEET_API_URL.
+// AutomaticEnv covers viper.Get, and ExperimentalBindStruct makes viper.Unmarshal
+// take its keys from the Config fields, so an env var reaches a field that the
+// config file does not set. viper.Reset clears the option, so call this after it.
+func BindEnvVars() {
+	viper.SetEnvPrefix(EnvPrefix)
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+	viper.SetOptions(viper.ExperimentalBindStruct())
+	// Aliases for adapters.cluster and adapters.nodepool, removed with the per-kind
+	// suites in HYPERFLEET-1734. HYPERFLEET_ADAPTERS_<KIND> still wins.
+	_ = viper.BindEnv("adapters.cluster", "API_ADAPTERS_CLUSTER")
+	_ = viper.BindEnv("adapters.nodepool", "API_ADAPTERS_NODEPOOL")
+	// Unprefixed alias for auth_mode. HYPERFLEET_AUTH_MODE still wins.
+	_ = viper.BindEnv(Authentication.Mode, "AUTH_MODE")
+}
+
+// applyDefaults applies default values for unset fields.
+// Per-kind adapters and timeouts default in the descriptor table instead.
 func (c *Config) applyDefaults() {
 	if c.AuthMode == "" {
 		c.AuthMode = DefaultAuthMode
 	}
 
 	// Apply timeout defaults
-	if c.Timeouts.Cluster.Reconciled == 0 {
-		c.Timeouts.Cluster.Reconciled = DefaultClusterReconciledTimeout
-	}
-	if c.Timeouts.Cluster.Deleted == 0 {
-		c.Timeouts.Cluster.Deleted = DefaultClusterDeletedTimeout
-	}
-	if c.Timeouts.NodePool.Reconciled == 0 {
-		c.Timeouts.NodePool.Reconciled = DefaultNodePoolReconciledTimeout
-	}
-	if c.Timeouts.NodePool.Deleted == 0 {
-		c.Timeouts.NodePool.Deleted = DefaultNodePoolDeletedTimeout
-	}
 	if c.Timeouts.Adapter.Processing == 0 {
 		c.Timeouts.Adapter.Processing = DefaultAdapterProcessingTimeout
 	}
@@ -469,14 +402,6 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Log.Output == "" {
 		c.Log.Output = DefaultLogOutput
-	}
-
-	// Apply adapter defaults
-	if c.Adapters.Cluster == nil {
-		c.Adapters.Cluster = DefaultClusterAdapters
-	}
-	if c.Adapters.NodePool == nil {
-		c.Adapters.NodePool = DefaultNodePoolAdapters
 	}
 
 	if c.Desire.Adapter == "" {
@@ -638,25 +563,15 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("configuration validation failed: brokerType must be one of: googlepubsub, rabbitmq. Got: %s", c.BrokerType)
 	}
 
-	// Validate that all timeouts and polling interval are positive
-	if c.Timeouts.Cluster.Reconciled <= 0 {
-		return fmt.Errorf("configuration validation failed: timeouts.cluster.reconciled must be a positive duration, got %v", c.Timeouts.Cluster.Reconciled)
-	}
-	if c.Timeouts.Cluster.Deleted <= 0 {
-		return fmt.Errorf("configuration validation failed: timeouts.cluster.deleted must be a positive duration, got %v", c.Timeouts.Cluster.Deleted)
-	}
-	if c.Timeouts.NodePool.Reconciled <= 0 {
-		return fmt.Errorf("configuration validation failed: timeouts.nodepool.reconciled must be a positive duration, got %v", c.Timeouts.NodePool.Reconciled)
-	}
-	if c.Timeouts.NodePool.Deleted <= 0 {
-		return fmt.Errorf("configuration validation failed: timeouts.nodepool.deleted must be a positive duration, got %v", c.Timeouts.NodePool.Deleted)
-	}
+	// Validate that the shared timeouts and polling interval are positive
 	if c.Timeouts.Adapter.Processing <= 0 {
 		return fmt.Errorf("configuration validation failed: timeouts.adapter.processing must be a positive duration, got %v", c.Timeouts.Adapter.Processing)
 	}
 	if c.Polling.Interval <= 0 {
 		return fmt.Errorf("configuration validation failed: polling.interval must be a positive duration, got %v", c.Polling.Interval)
 	}
+
+	// Load validated the per-kind adapters and timeouts when it built Entities.
 
 	// Validate identity tokenRequest config
 	if c.Identity.TokenRequest.IsEnabled() {
@@ -697,9 +612,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Display logs the merged configuration using structured logging
+// Display logs the merged configuration using structured logging.
+// Each descriptor row with adapters or timeouts logs adapters_<key>,
+// timeout_<key>_reconciled and timeout_<key>_deleted.
 func (c *Config) Display() {
-	slog.Info("Loaded configuration",
+	slog.Info("Loaded configuration", append([]any{
 		"api_url", redactURL(c.API.URL),
 		"auth_mode", c.AuthMode,
 		"namespace", c.Namespace,
@@ -707,17 +624,11 @@ func (c *Config) Display() {
 		"output_dir", c.OutputDir,
 		"testdata_dir", c.TestDataDir,
 		"run_id", c.RunID,
-		"timeout_cluster_reconciled", c.Timeouts.Cluster.Reconciled,
-		"timeout_cluster_deleted", c.Timeouts.Cluster.Deleted,
-		"timeout_nodepool_reconciled", c.Timeouts.NodePool.Reconciled,
-		"timeout_nodepool_deleted", c.Timeouts.NodePool.Deleted,
 		"timeout_adapter_processing", c.Timeouts.Adapter.Processing,
 		"polling_interval", c.Polling.Interval,
 		"log_level", c.Log.Level,
 		"log_format", c.Log.Format,
 		"log_output", c.Log.Output,
-		"adapters_cluster", c.Adapters.Cluster,
-		"adapters_nodepool", c.Adapters.NodePool,
 		"adapter_chart_repo", redactURL(c.AdapterDeployment.ChartRepo),
 		"adapter_chart_ref", valueOrNotSet(c.AdapterDeployment.ChartRef),
 		"adapter_chart_path", valueOrNotSet(c.AdapterDeployment.ChartPath),
@@ -732,7 +643,26 @@ func (c *Config) Display() {
 		"identity_token_request_ns", valueOrNotSet(c.Identity.TokenRequest.Namespace),
 		"identity_token_request_audience", valueOrNotSet(c.Identity.TokenRequest.Audience),
 		"desire_adapter", c.Desire.Adapter,
-	)
+	}, c.entityLogAttrs()...)...)
+}
+
+// entityLogAttrs returns the resolved runtime settings of each row that has any,
+// in table order.
+func (c *Config) entityLogAttrs() []any {
+	var attrs []any
+	for _, def := range EntityDescriptors() {
+		row := c.Entities.MustGet(def.Kind)
+		if len(row.RequiredAdapters) == 0 && row.Timeouts == (descriptor.EntityTimeouts{}) {
+			continue
+		}
+		key := entityKey(row.Kind)
+		attrs = append(attrs,
+			"adapters_"+key, row.RequiredAdapters,
+			"timeout_"+key+"_reconciled", row.Timeouts.Reconciled,
+			"timeout_"+key+"_deleted", row.Timeouts.Deleted,
+		)
+	}
+	return attrs
 }
 
 // valueOrNotSet returns the value if non-empty, otherwise returns NotSetPlaceholder

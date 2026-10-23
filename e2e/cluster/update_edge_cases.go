@@ -26,7 +26,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 			Expect(cluster.Id).NotTo(BeNil())
 			clusterID = *cluster.Id
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 
 			ginkgo.By("waiting for all adapters to reconcile at the final generation")
 			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, int32(4)))
+				Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("Cluster").RequiredAdapters, int32(4)))
 
 			ginkgo.By("verifying cluster reaches Reconciled=True at final generation")
 			Eventually(func(g Gomega) {
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 					}
 				}
 				g.Expect(found).To(BeTrue(), "cluster should have Reconciled=True")
-			}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+			}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {

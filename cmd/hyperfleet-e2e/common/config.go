@@ -3,8 +3,6 @@ package common
 import (
 	"fmt"
 	"os"
-	"reflect"
-	"strings"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/spf13/viper"
@@ -29,64 +27,11 @@ func LoadConfig(configFlagValue string) error {
 		}
 	}
 
-	// 3. Enable environment variable support (AFTER reading config file)
-	viper.SetEnvPrefix(config.EnvPrefix)
-	viper.AutomaticEnv() // Enable automatic environment variable checking
-
-	// Replace dots with underscores in env var names
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// 4. Automatically bind all config paths to environment variables
-	// This uses reflection to traverse the Config struct and bind all paths
-	// Binding AFTER reading config ensures env vars override config file values
-	bindAllEnvVars()
-
-	// 5. Add custom environment variable bindings
-	// These allow alternative env var names for specific config paths
-	_ = viper.BindEnv("adapters.cluster", "API_ADAPTERS_CLUSTER")
-	_ = viper.BindEnv("adapters.nodepool", "API_ADAPTERS_NODEPOOL")
-	_ = viper.BindEnv(config.Authentication.Mode, "AUTH_MODE", "HYPERFLEET_AUTH_MODE")
+	// 3. Enable HYPERFLEET_* environment variables and the API_ADAPTERS_* and
+	// AUTH_MODE aliases; env vars override config file values
+	config.BindEnvVars()
 
 	return nil
-}
-
-// bindAllEnvVars automatically binds all config struct fields to environment variables
-// using reflection to traverse the config.Config structure
-func bindAllEnvVars() {
-	// Get the Config struct type
-	configType := reflect.TypeOf(config.Config{})
-
-	// Recursively bind all fields
-	bindStructFields(configType, "")
-}
-
-// bindStructFields recursively binds struct fields to environment variables
-func bindStructFields(t reflect.Type, prefix string) {
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-
-		tag := field.Tag.Get(config.TagMapstructure)
-		if tag == "" {
-			continue
-		}
-
-		var configPath string
-		if prefix == "" {
-			configPath = tag
-		} else {
-			configPath = prefix + "." + tag
-		}
-
-		// Convert dots to underscores: api.url -> HYPERFLEET_API_URL
-		envVar := config.EnvVar(strings.ToUpper(strings.ReplaceAll(configPath, ".", "_")))
-
-		_ = viper.BindEnv(configPath, envVar)
-
-		fieldType := field.Type
-		if fieldType.Kind() == reflect.Struct {
-			bindStructFields(fieldType, configPath)
-		}
-	}
 }
 
 // getConfigFilePath determines the config file path following standard priority

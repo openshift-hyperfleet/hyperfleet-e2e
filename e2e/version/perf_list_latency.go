@@ -6,7 +6,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -40,7 +39,7 @@ var _ = ginkgo.Describe("[Suite: version][perf] API list latency",
 		})
 
 		ginkgo.It("should list versions within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions", config.ThresholdAPIList, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions", h.Entities.MustGet("Version").Thresholds.List, helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListVersions(ctx, channelID, "")
 					Expect(err).NotTo(HaveOccurred())

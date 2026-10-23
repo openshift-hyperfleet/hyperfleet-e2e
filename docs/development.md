@@ -106,7 +106,7 @@ var _ = ginkgo.Describe(testName,
             })
 
             ginkgo.By("waiting for cluster to become Reconciled")
-            Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+            Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
                 Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
         })
     },
@@ -220,7 +220,7 @@ Expect(cluster.Id).NotTo(BeNil())
 Expect(cluster.Generation).To(Equal(int32(1)))
 
 // Async: use pollers + custom matchers (preferred)
-Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 // Async: use func(g Gomega) for complex one-off assertions
@@ -238,7 +238,9 @@ Eventually(func(g Gomega) {
 The framework uses **pollers** (functions that fetch current state) and **custom matchers** (reusable Gomega assertions) to compose async checks. This avoids a combinatorial explosion of `WaitFor*` helper functions.
 
 Resolve descriptors after `helper.New()` so they include the configured adapter
-lists and timeouts. `h.Entities.MustGet("Cluster")` is for known kind literals;
+lists and timeouts. Take per-kind adapters, timeouts and perf thresholds from the
+descriptor (`RequiredAdapters`, `Timeouts`, `Thresholds`), never from `h.Cfg`.
+`h.Entities.MustGet("Cluster")` is for known kind literals;
 `h.Entities.Lookup(kind)` returns an error for unknown runtime input. Helpers take
 `(ctx, entity, parentID, resourceID)`, with an empty parent ID for root resources.
 Pass the same descriptor to `AdapterDeploymentOptions.Entity`,
@@ -247,23 +249,40 @@ restoration also take that descriptor; `GetAPIRequiredAdapters(entity)` returns 
 descriptor's configured baseline, not the current live Helm values. Copy the
 adapter slice before making temporary changes, as `stuck_deletion.go` does.
 
-Add kinds in the single table in `pkg/config/descriptor.go`, including their
-runtime settings and cleanup policy. Helpers do not dispatch on kind names.
-The current production rows use existing config fields. Every row with
-`Cleanup.WaitForHardDelete` must have a positive `Timeouts.Deleted`; catalog
-validation rejects zero or negative values. `Parent` and `CascadeChild` use a
-shared two-minute deletion default. Other fixture runtime settings remain unset.
-See the [entity catalog](architecture.md#pkghelper).
+Add a kind with one row in the single table in `pkg/config/descriptor.go`. The
+row holds routing, cleanup policy and the default runtime settings: required
+adapters (the release names hyperfleet-infra deploys), `Timeouts` and
+perf `Thresholds`. Helpers do not dispatch on kind names, and the kind needs no
+config field, default constant or env alias. Config keys are the kind in lower
+case, so the new row can be overridden at once:
+
+```yaml
+adapters:
+  parent: ["p-success"]   # replaces the row's list
+timeouts:
+  parent:
+    reconciled: 5m        # a field left out keeps the row default
+```
+
+The env forms are `HYPERFLEET_ADAPTERS_PARENT` (comma- or space-separated) and
+`HYPERFLEET_TIMEOUTS_PARENT_RECONCILED` / `_DELETED`. Loading fails on a YAML key
+that is not a table kind or timeout field, a scalar or list where a map belongs
+(`timeouts.cluster: 5m`), a timeout without a unit (`"300"` or `300`), an empty
+adapter list, a negative timeout, and a row with adapters and no reconciled
+timeout. A row that waits for hard-delete needs a positive deleted timeout in the
+table; a missing or zero config value keeps that default. Thresholds
+are code in the row and cannot be overridden. See the
+[descriptor table](architecture.md#pkghelper).
 
 ### Wait for Resource Condition
 
 ```go
 // Cluster
-Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 // NodePool (same poller and matcher, with parent context)
-Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 ```
 
@@ -272,11 +291,11 @@ Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Cfg.T
 ```go
 // All adapters finalized
 Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), timeout, h.Cfg.Polling.Interval).
-    Should(helper.HaveAllAdaptersWithCondition(h.Cfg.Adapters.Cluster, client.ConditionTypeFinalized, client.AdapterConditionStatusTrue))
+    Should(helper.HaveAllAdaptersWithCondition(h.Entities.MustGet("Cluster").RequiredAdapters, client.ConditionTypeFinalized, client.AdapterConditionStatusTrue))
 
 // All adapters at a specific generation with Applied+Available+Health=True
 Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), timeout, h.Cfg.Polling.Interval).
-    Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
+    Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("Cluster").RequiredAdapters, expectedGen))
 ```
 
 ### Wait for Hard-Delete
@@ -406,7 +425,7 @@ Expect(err).NotTo(HaveOccurred())
 ### Wait for Condition
 
 ```go
-Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 ```
 
@@ -414,7 +433,7 @@ Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Time
 
 ```go
 Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-    Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
+    Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("Cluster").RequiredAdapters, expectedGen))
 ```
 
 ### Verify Adapter Conditions Synchronously

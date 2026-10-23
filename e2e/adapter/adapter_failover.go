@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("[Suite: adapter-failures][negative] Adapter framework c
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
 						client.ConditionTypeLastKnownReconciled, client.ResourceConditionStatusTrue)).To(BeTrue(),
 						"cluster LastKnownReconciled should become True despite non-required adapter failure")
-				}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+				}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 
 				ginkgo.GinkgoWriter.Printf("Verified cluster reconciled despite non-required adapter failure\n")
 			})

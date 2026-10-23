@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 					}
 				})
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("Verify stuck-adapter reported Applied=True")
@@ -216,7 +216,7 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 				Expect(err).NotTo(HaveOccurred(), "failed to scale up stuck-adapter")
 
 				ginkgo.By("Verify cluster is hard-deleted after stuck-adapter recovery")
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.By("Verify downstream K8s cl-stuck-<clusterID> namespace is cleaned up")

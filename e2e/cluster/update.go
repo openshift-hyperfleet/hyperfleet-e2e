@@ -32,7 +32,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 				}
 			})
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 
 			ginkgo.By("waiting for all adapters to reconcile at new generation")
 			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.Cluster, expectedGen))
+				Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("Cluster").RequiredAdapters, expectedGen))
 
 			ginkgo.By("verifying cluster reaches Reconciled=True at new generation")
 			Eventually(func(g Gomega) {
@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Cluster Update Lifecycle",
 					}
 				}
 				g.Expect(found).To(BeTrue(), "cluster should have Reconciled=True")
-			}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+			}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 		})
 
 	},

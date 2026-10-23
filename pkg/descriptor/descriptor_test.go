@@ -60,30 +60,38 @@ func TestCatalogRejectsInvalidDefinitions(t *testing.T) {
 	}
 }
 
-func TestCatalogValidatesHardDeleteTimeout(t *testing.T) {
+func TestCatalogValidatesRuntimeSettings(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name    string
-		wait    bool
-		timeout time.Duration
-		wantErr bool
+		name     string
+		adapters []string
+		timeouts EntityTimeouts
+		wait     bool
+		wantErr  string // empty when the row is valid
 	}{
-		{"zero timeout", true, 0, true},
-		{"negative timeout", true, -time.Second, true},
-		{"positive timeout", true, time.Second, false},
-		{"no hard-delete polling", false, 0, false},
+		{name: "hard-delete with zero deleted timeout", wait: true, wantErr: "positive deleted timeout"},
+		{name: "hard-delete with positive deleted timeout", wait: true, timeouts: EntityTimeouts{Deleted: time.Second}},
+		{name: "no hard-delete polling and no timeouts"},
+		{name: "negative deleted timeout", timeouts: EntityTimeouts{Deleted: -time.Second}, wantErr: "timeouts must not be negative"},
+		{name: "negative reconciled timeout", timeouts: EntityTimeouts{Reconciled: -time.Second}, wantErr: "timeouts must not be negative"},
+		{name: "adapters without a reconciled timeout", adapters: []string{"a"}, wantErr: "required adapters but no reconciled timeout"},
+		{name: "adapters with a reconciled timeout", adapters: []string{"a"}, timeouts: EntityTimeouts{Reconciled: time.Second}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NewCatalog([]EntityDescriptor{{
 				Kind: "Fixture", Plural: "fixtures",
-				Timeouts: EntityTimeouts{Deleted: tc.timeout},
-				Cleanup:  CleanupPolicy{WaitForHardDelete: tc.wait},
+				RequiredAdapters: tc.adapters,
+				Timeouts:         tc.timeouts,
+				Cleanup:          CleanupPolicy{WaitForHardDelete: tc.wait},
 			}})
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("err=%v, wantErr=%v", err, tc.wantErr)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
 			}
-			if tc.wantErr && (!strings.Contains(err.Error(), "Fixture") || !strings.Contains(err.Error(), "positive deleted timeout")) {
-				t.Fatalf("error does not identify the invalid entity setting: %v", err)
+			if err == nil || !strings.Contains(err.Error(), "Fixture") || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v, want it to name Fixture and contain %q", err, tc.wantErr)
 			}
 		})
 	}
@@ -92,7 +100,8 @@ func TestCatalogValidatesHardDeleteTimeout(t *testing.T) {
 func TestCatalogOwnsMutableSettings(t *testing.T) {
 	t.Parallel()
 	rows := []EntityDescriptor{
-		{Kind: "Root", Plural: "roots", RequiredAdapters: []string{"success"}, Cleanup: CleanupPolicy{ChildKinds: []string{"Child"}}},
+		{Kind: "Root", Plural: "roots", RequiredAdapters: []string{"success"}, Timeouts: EntityTimeouts{Reconciled: time.Second},
+			Cleanup: CleanupPolicy{ChildKinds: []string{"Child"}}},
 		{Kind: "Child", Plural: "children", ParentKind: "Root", OnParentDelete: "restrict"},
 	}
 	catalog, err := NewCatalog(rows)

@@ -56,6 +56,9 @@ func New() *Helper {
 	if cfg == nil {
 		log.Fatalf("Suite config not initialized")
 	}
+	if cfg.Entities == nil {
+		log.Fatalf("Suite config has no entity catalog; build it with config.Load")
+	}
 	adapterDeploymentList := GetAdapterDeploymentList()
 	if adapterDeploymentList == nil {
 		log.Fatalf("Adapter deployment list not initialized")
@@ -76,13 +79,8 @@ func New() *Helper {
 		log.Fatalf("Failed to create HyperFleet client: %v", err)
 	}
 
-	entities, err := cfg.EntityCatalog()
-	if err != nil {
-		log.Fatalf("Invalid entity catalog: %v", err)
-	}
-
 	return &Helper{
-		Entities:              entities,
+		Entities:              cfg.Entities,
 		Cfg:                   cfg,
 		Client:                cl,
 		K8sClient:             k8sClient,

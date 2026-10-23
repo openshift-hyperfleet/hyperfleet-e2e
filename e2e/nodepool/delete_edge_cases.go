@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			ginkgo.By("creating two nodepools")
@@ -43,10 +43,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			nodepoolID2 = *np2.Id
 
 			ginkgo.By("waiting for both nodepools to reach Reconciled")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID1), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID1), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID2), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID2), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][delete] Sibling Nodepool Isolation Du
 			ginkgo.By("verifying sibling nodepool adapter statuses are intact")
 			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID2), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 				Should(helper.HaveAllAdaptersWithCondition(
-					h.Cfg.Adapters.NodePool, client.ConditionTypeApplied, client.AdapterConditionStatusTrue))
+					h.Entities.MustGet("NodePool").RequiredAdapters, client.ConditionTypeApplied, client.AdapterConditionStatusTrue))
 
 			ginkgo.By("verifying parent cluster is unaffected")
 			parentCluster, err := h.Client.GetCluster(ctx, clusterID)

@@ -29,7 +29,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 					}
 				})
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("creating a nodepool")
@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				nodepoolID := *np.Id
 
 				ginkgo.By("waiting for Reconciled=True at generation 1")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("PATCHing nodepool spec to trigger generation bump")
@@ -54,9 +54,9 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				ginkgo.By("waiting for Reconciled=True at generation 2")
 				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
 					h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-					Should(helper.HaveAllAdaptersAtGeneration(h.Cfg.Adapters.NodePool, int32(2)))
+					Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("NodePool").RequiredAdapters, int32(2)))
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("soft-deleting the nodepool")

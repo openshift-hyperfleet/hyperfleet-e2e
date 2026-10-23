@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -34,7 +33,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Update-to-re-reconciled latency"
 			})
 
 			ginkgo.By("waiting for cluster to reach Reconciled before update")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -53,11 +52,11 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Update-to-re-reconciled latency"
 				g.Expect(h.HasResourceCondition(cluster.Status.Conditions,
 					client.ConditionTypeReconciled, client.ResourceConditionStatusTrue)).
 					To(BeTrue(), "expected Reconciled=True at generation %d", expectedGen)
-			}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+			}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 
 			elapsed := time.Since(start)
 			ginkgo.GinkgoWriter.Printf("[PERF] Cluster update-to-re-reconciled latency: %v\n", elapsed)
-			Expect(elapsed).To(BeNumerically("<", config.ThresholdClusterUpdateReconciled),
+			Expect(elapsed).To(BeNumerically("<", h.Entities.MustGet("Cluster").Thresholds.UpdateReconciled),
 				"cluster update-to-re-reconciled exceeded threshold")
 		})
 	},

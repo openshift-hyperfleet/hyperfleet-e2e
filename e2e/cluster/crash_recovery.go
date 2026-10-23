@@ -249,5 +249,5 @@ func verifyClusterReconciled(ctx context.Context, h *helper.Helper, clusterID st
 		g.Expect(h.HasResourceCondition(cl.Status.Conditions,
 			client.ConditionTypeLastKnownReconciled, client.ResourceConditionStatusTrue)).To(BeTrue(),
 			"cluster LastKnownReconciled condition should transition to True")
-	}, h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+	}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
 }

@@ -35,7 +35,7 @@ Run `make check` before you call work done, then `make build`.
 - CI failures and log locations: `docs/debugging.md`
 - Test case documents and templates: `test-design/` (start at `test-design/README.md`)
 - Which layer a test belongs in (unit / integration / E2E): [test placement strategy](https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/docs/e2e-testing/test-placement-strategy.md)
-- Config defaults, struct, file: `pkg/config/defaults.go`, `pkg/config/config.go`, `configs/config.yaml`
+- Config defaults, struct, file: `pkg/config/defaults.go`, `pkg/config/config.go`, `configs/config.yaml`. Per-kind adapters, timeouts and thresholds: the descriptor table in `pkg/config/descriptor.go`
 - Pollers and matchers: `pkg/helper/pollers.go`, `pkg/helper/matchers.go`. Reuse these before writing new ones
 
 ## Writing E2E specs
@@ -57,12 +57,12 @@ Run `make check` before you call work done, then `make build`.
 Use `Eventually` with a poller and a matcher in the spec itself. Do not write `WaitFor*` helpers that hide `Eventually`.
 
 ```go
-Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
     Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 ```
 
 - For a one-off compound check, use `Eventually(func(g Gomega) { g.Expect(...) }).Should(Succeed())`. Inside the closure, call `g.Expect`, not bare `Expect`.
-- Take timeouts and intervals from `h.Cfg.Timeouts.*` and `h.Cfg.Polling.Interval`. Never hardcode durations.
+- Take per-kind timeouts from the descriptor (`h.Entities.MustGet(kind).Timeouts.Reconciled`, `.Deleted`), and `h.Cfg.Timeouts.Adapter.Processing` and `h.Cfg.Polling.Interval` from config. Never hardcode durations.
 - Mark major steps with `ginkgo.By()`, but never inside an `Eventually` closure.
 
 ### Cleanup
@@ -89,8 +89,8 @@ if expected := h.ExpectedIdentity(); expected != "" {
 
 - Resolve a known descriptor after `helper.New()` with `h.Entities.MustGet("Cluster")`; use `Lookup` for runtime kind names. Generic resource helpers take a descriptor and parent ID (empty for roots).
 
-- Adapter names come from config at runtime: `h.Cfg.Adapters.Cluster` and `h.Cfg.Adapters.NodePool`. Never hardcode them. `configs/config.yaml` (for example `cl-namespace`) overrides the compiled defaults in `pkg/config/defaults.go` (for example `clusters-namespace`).
-- Config priority: CLI flags > `HYPERFLEET_*` env vars > `configs/config.yaml` > `pkg/config/defaults.go`. Config file path: `--config` > `HYPERFLEET_CONFIG` > `./configs/config.yaml`.
+- Adapter names come from the descriptor row at runtime: `h.Entities.MustGet("Cluster").RequiredAdapters`. Never hardcode them. The row in `pkg/config/descriptor.go` holds the hyperfleet-infra release names as defaults. YAML (`adapters.<kind>`, `timeouts.<kind>`) and env (`HYPERFLEET_ADAPTERS_<KIND>`, `HYPERFLEET_TIMEOUTS_<KIND>_RECONCILED`) override them by kind, lower case in YAML and upper case in env; an unknown kind in YAML or an empty adapter list fails config loading.
+- Config priority: CLI flags > `HYPERFLEET_*` env vars > `configs/config.yaml` > `pkg/config/defaults.go` (per-kind values: the descriptor rows in `pkg/config/descriptor.go`). Config file path: `--config` > `HYPERFLEET_CONFIG` > `./configs/config.yaml`.
 - `helper.New()` calls `log.Fatalf` when the suite config is nil; call `helper.SetSuiteConfig` first. `Config.Validate()` returns an error rather than panicking. Outside `--dry-run` it requires `API.URL` and a `RunID` that is a valid K8s label value (`RUN_ID`), and it always checks `brokerType`.
 - Logging uses `log/slog` directly. There is no custom logger wrapper.
 

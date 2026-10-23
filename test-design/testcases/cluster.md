@@ -70,9 +70,10 @@ curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/statuses
 **Expected Result:**
 - Response returns HTTP 200 (OK) status code
 - All required adapters from config are present in the response:
-  - `clusters-namespace`
-  - `clusters-job`
-  - `clusters-deployment`
+  - `cl-namespace`
+  - `cl-job`
+  - `cl-deployment`
+  - `cl-desire`
 - Each required adapter has all required condition types: `Applied`, `Available`, `Health`
 - Each condition has `status: "True"` indicating successful execution
 - **Adapter condition metadata validation** (for each condition in adapter.conditions):
@@ -84,7 +85,7 @@ curl -X GET ${API_URL}/api/hyperfleet/v1/clusters/{cluster_id}/statuses
   - `last_report_time`: Valid RFC3339 timestamp when the adapter last reported its status
   - `observed_generation`: Non-nil integer value equal to 1 for new creation requests
 
-**Note:** Required adapters are configurable via:
+**Note:** Required adapters default to the Cluster row in `pkg/config/descriptor.go` and are configurable via:
 - Config file: `configs/config.yaml` under `adapters.cluster`
 - Environment variable: `HYPERFLEET_ADAPTERS_CLUSTER` (comma-separated list)
 

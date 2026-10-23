@@ -122,7 +122,7 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport][negative] Adapter re
 					To(Succeed(), "failed to restore the applier")
 
 				ginkgo.By("verifying the cluster converges once the applier is back")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("verifying the remote adapter reports Applied, Available and Health True at the cluster generation")

@@ -6,7 +6,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/labels"
 )
@@ -34,7 +33,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] API read latency",
 		})
 
 		ginkgo.It("should read a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels/{id}", config.ThresholdAPIRead, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /channels/{id}", h.Entities.MustGet("Channel").Thresholds.Read, helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.GetChannel(ctx, channelID)
 					Expect(err).NotTo(HaveOccurred())

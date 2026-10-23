@@ -104,7 +104,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 				ginkgo.By("Wait for all nodepools to reach Reconciled=True and Available=True")
 				for i, npID := range nodepoolIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for nodepool %d (%s) to become Reconciled...\n", i, npID)
-					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Cfg.Timeouts.NodePool.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					np, err := h.Client.GetNodePool(ctx, clusterID, npID)
@@ -143,7 +143,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 							adapterMap[adapter.Adapter] = adapter
 						}
 
-						for _, requiredAdapter := range h.Cfg.Adapters.NodePool {
+						for _, requiredAdapter := range h.Entities.MustGet("NodePool").RequiredAdapters {
 							adapter, exists := adapterMap[requiredAdapter]
 							g.Expect(exists).To(BeTrue(),
 								"nodepool %d (%s): required adapter %s should be present", i, npID, requiredAdapter)

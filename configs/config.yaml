@@ -33,27 +33,21 @@ api:
 # ============================================================================
 
 timeouts:
-  cluster:
-    # Maximum time to wait for cluster Reconciled condition
-    #
-    # Format: Duration string (e.g., "30m", "1h", "5m")
-    # Can be overridden by: HYPERFLEET_TIMEOUTS_CLUSTER_RECONCILED
-    reconciled: 2m
-
-    # Maximum time to wait for cluster hard-delete (404 response)
-    # Can be overridden by: HYPERFLEET_TIMEOUTS_CLUSTER_DELETED
-    deleted: 2m
-
-  nodepool:
-    # Maximum time to wait for nodepool Reconciled condition
-    #
-    # Format: Duration string
-    # Can be overridden by: HYPERFLEET_TIMEOUTS_NODEPOOL_RECONCILED
-    reconciled: 2m
-
-    # Maximum time to wait for nodepool hard-delete (404 response)
-    # Can be overridden by: HYPERFLEET_TIMEOUTS_NODEPOOL_DELETED
-    deleted: 2m
+  # Per-kind timeouts default in the descriptor table (EntityDescriptors in
+  # pkg/config/descriptor.go). Override them under timeouts.<kind>, where <kind>
+  # is any descriptor kind in lower case (cluster, nodepool, parent,
+  # cascadechild, ...). A field left out or set to zero keeps the row default;
+  # an unknown <kind> or field, or a value without a unit ("300" or 300), fails
+  # the run.
+  #
+  # Format: Duration string with a unit (e.g., "30m", "1h", "5m")
+  # Can be overridden by:
+  #   - HYPERFLEET_TIMEOUTS_<KIND>_RECONCILED (time to reach the Reconciled condition)
+  #   - HYPERFLEET_TIMEOUTS_<KIND>_DELETED (time to hard-delete, a 404 response)
+  #
+  # Example override (not the defaults):
+  # cluster:
+  #   reconciled: 10m
 
   adapter:
     # Maximum time to wait for adapter processing
@@ -99,29 +93,23 @@ log:
 # Adapter Configuration
 # ============================================================================
 
-adapters:
-  # Required adapters for cluster resources
-  # List of adapter names that must be present and have correct conditions
-  # when validating cluster adapter execution
-  #
-  # Can be overridden by (comma-separated):
-  #   - HYPERFLEET_ADAPTERS_CLUSTER
-  #   - API_ADAPTERS_CLUSTER
-  cluster:
-    - "cl-namespace"
-    - "cl-job"
-    - "cl-deployment"
-    - "cl-desire"
-
-  # Required adapters for nodepool resources
-  # List of adapter names that must be present and have correct conditions
-  # when validating nodepool adapter execution
-  #
-  # Can be overridden by (comma-separated):
-  #   - HYPERFLEET_ADAPTERS_NODEPOOL
-  #   - API_ADAPTERS_NODEPOOL
-  nodepool:
-    - "np-configmap"
+# Each descriptor kind's required adapters default in the descriptor table
+# (EntityDescriptors in pkg/config/descriptor.go) to the names hyperfleet-infra
+# deploys. The specs check that each one is present and has the expected
+# conditions. Override a kind's list under adapters.<kind>, where <kind> is any
+# descriptor kind in lower case; a key that is present replaces the whole list
+# and must name at least one adapter (blank names are dropped), and an unknown
+# <kind> fails the run. A kind with adapters also needs a reconciled timeout.
+#
+# Can be overridden by (comma-separated):
+#   - HYPERFLEET_ADAPTERS_<KIND>
+#   - API_ADAPTERS_CLUSTER / API_ADAPTERS_NODEPOOL (aliases for cluster and
+#     nodepool, removed with the per-kind suites in HYPERFLEET-1734)
+#
+# Example override (not the defaults; the list replaces the row's list):
+# adapters:
+#   nodepool:
+#     - "np-custom"
 
 # ============================================================================
 # Delivery Path Configuration
@@ -129,8 +117,9 @@ adapters:
 
 desire:
   # The cluster adapter that delivers on a remote transport (desire store ->
-  # applier). It must also be listed in adapters.cluster: the remote-transport
-  # suite fails when it is not, so the tier suites always check the remote path.
+  # applier). It must also be one of the Cluster required adapters: the
+  # remote-transport suite fails when it is not, so the tier suites always check
+  # the remote path.
   # Can be overridden by: HYPERFLEET_DESIRE_ADAPTER
   adapter: "cl-desire"
 
