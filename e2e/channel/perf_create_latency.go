@@ -22,7 +22,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Create latency",
 		})
 
 		ginkgo.It("should create a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /channels", config.ThresholdAPICreate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("POST /channels", h.Cfg.APILatencyThreshold(config.ThresholdAPICreate), helper.DefaultSamples,
 				func(int) {
 					channel, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 					if channel != nil && channel.Id != nil {

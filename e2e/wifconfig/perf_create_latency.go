@@ -22,7 +22,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Create latency",
 		})
 
 		ginkgo.It("should create a wifconfig within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /wifconfigs", config.ThresholdAPICreate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("POST /wifconfigs", h.Cfg.APILatencyThreshold(config.ThresholdAPICreate), helper.DefaultSamples,
 				func(int) {
 					wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
 					if wifConfig != nil && wifConfig.Id != nil {

@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[Suite: version][perf] API list latency",
 		})
 
 		ginkgo.It("should list versions within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions", config.ThresholdAPIList, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions", h.Cfg.APILatencyThreshold(config.ThresholdAPIList), helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListVersions(ctx, channelID, "")
 					Expect(err).NotTo(HaveOccurred())

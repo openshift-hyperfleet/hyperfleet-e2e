@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] API read latency",
 		})
 
 		ginkgo.It("should read a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels/{id}", config.ThresholdAPIRead, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /channels/{id}", h.Cfg.APILatencyThreshold(config.ThresholdAPIRead), helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.GetChannel(ctx, channelID)
 					Expect(err).NotTo(HaveOccurred())

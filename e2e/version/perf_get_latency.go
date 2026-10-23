@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("[Suite: version][perf] API read latency",
 		})
 
 		ginkgo.It("should read a version within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions/{id}", config.ThresholdAPIRead, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions/{id}", h.Cfg.APILatencyThreshold(config.ThresholdAPIRead), helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.GetVersion(ctx, channelID, versionID)
 					Expect(err).NotTo(HaveOccurred())

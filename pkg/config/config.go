@@ -262,6 +262,18 @@ func (c *Config) MachineAuthorizationScheme() string {
 	return AuthorizationSchemeBearer
 }
 
+// APILatencyThreshold returns the latency budget for a single API request in
+// the configured authentication mode. The base thresholds are calibrated for
+// the request path without gateway authentication; EDGE and EDGE+API add the
+// Authorino authorization hop to every request, so those modes get the
+// DefaultAuthLatencyAllowance on top of the base threshold.
+func (c *Config) APILatencyThreshold(base time.Duration) time.Duration {
+	if c.AuthMode == AuthModeEdge || c.AuthMode == AuthModeEdgeAPI {
+		return base + DefaultAuthLatencyAllowance
+	}
+	return base
+}
+
 // AdapterAuthEnabled reports whether adapters should use projected API tokens.
 // An unset mode preserves the legacy TokenRequest-driven behavior for callers
 // that construct Config directly rather than loading it through config.Load.

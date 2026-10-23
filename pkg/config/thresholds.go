@@ -56,3 +56,12 @@ const (
 // 75ms is above the highest Prow median seen (74.3ms). Recalibrate after
 // HYPERFLEET-1766 removes the extra reads. HYPERFLEET-1734 replaces these specs.
 const ThresholdAPINestedWrite = 75 * time.Millisecond // baseline ~43ms
+
+// DefaultAuthLatencyAllowance is added to API latency thresholds when the
+// gateway authenticates requests (AUTH_MODE=EDGE or EDGE+API). Every request
+// then traverses Envoy -> Authorino (ext_authz) -> Kubernetes TokenReview
+// before reaching the API. The first EDGE+API nightly (2026-10-23) measured a
+// uniform +10-25ms per request, up to +36ms on filtered cluster lists,
+// against the 2026-10-22 API-mode run on the same cluster. See
+// HYPERFLEET-1848.
+const DefaultAuthLatencyAllowance = 30 * time.Millisecond

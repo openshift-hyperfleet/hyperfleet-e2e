@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -232,5 +233,31 @@ func TestAuthModeRejectsCustomRunnerServiceAccount(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "serviceAccountName is fixed") {
 		t.Errorf("Load error = %q, want fixed runner ServiceAccount validation error", err)
+	}
+}
+
+func TestAPILatencyThreshold(t *testing.T) {
+	const base = 50 * time.Millisecond
+
+	tests := []struct {
+		name string
+		mode string
+		want time.Duration
+	}{
+		{name: "API mode keeps the base threshold", mode: config.AuthModeAPI, want: base},
+		{name: "NONE keeps the base threshold", mode: config.AuthModeNone, want: base},
+		{name: "EDGE adds the auth latency allowance", mode: config.AuthModeEdge, want: base + config.DefaultAuthLatencyAllowance},
+		{name: "EDGE+API adds the auth latency allowance", mode: config.AuthModeEdgeAPI, want: base + config.DefaultAuthLatencyAllowance},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := &config.Config{AuthMode: tt.mode}
+			if got := cfg.APILatencyThreshold(base); got != tt.want {
+				t.Errorf("APILatencyThreshold(%v) with AUTH_MODE=%s = %v, want %v", base, tt.mode, got, tt.want)
+			}
+		})
 	}
 }

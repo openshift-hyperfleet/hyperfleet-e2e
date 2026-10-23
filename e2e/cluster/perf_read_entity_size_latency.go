@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API read latency by entity size"
 				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Cluster.Reconciled, h.Cfg.Polling.Interval).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-				helper.MeasureMedianLatency("GET /clusters/{id} ("+size.name+" entity)", config.ThresholdAPIRead, helper.DefaultSamples,
+				helper.MeasureMedianLatency("GET /clusters/{id} ("+size.name+" entity)", h.Cfg.APILatencyThreshold(config.ThresholdAPIRead), helper.DefaultSamples,
 					func(int) {
 						_, err := h.Client.GetCluster(ctx, clusterID)
 						Expect(err).NotTo(HaveOccurred())

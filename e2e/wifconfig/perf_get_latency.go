@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] API read latency",
 		})
 
 		ginkgo.It("should read a wifconfig within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /wifconfigs/{id}", config.ThresholdAPIRead, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /wifconfigs/{id}", h.Cfg.APILatencyThreshold(config.ThresholdAPIRead), helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.GetWifConfig(ctx, wifConfigID)
 					Expect(err).NotTo(HaveOccurred())

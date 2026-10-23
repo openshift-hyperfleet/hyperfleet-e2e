@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Update latency",
 		})
 
 		ginkgo.It("should update a wifconfig within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("PATCH /wifconfigs/{id}", config.ThresholdAPIUpdate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("PATCH /wifconfigs/{id}", h.Cfg.APILatencyThreshold(config.ThresholdAPIUpdate), helper.DefaultSamples,
 				func(i int) {
 					_, err := h.Client.PatchWifConfig(ctx, wifConfigID, client.ResourcePatchRequest{
 						Spec: map[string]any{

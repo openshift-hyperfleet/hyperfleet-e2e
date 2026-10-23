@@ -31,7 +31,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Delete latency",
 				h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.Id)
 			}
 
-			helper.MeasureMedianLatency("DELETE /wifconfigs/{id}", config.ThresholdAPIDelete, len(wifConfigIDs),
+			helper.MeasureMedianLatency("DELETE /wifconfigs/{id}", h.Cfg.APILatencyThreshold(config.ThresholdAPIDelete), len(wifConfigIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteWifConfig(ctx, wifConfigIDs[i])
 					Expect(err).NotTo(HaveOccurred())

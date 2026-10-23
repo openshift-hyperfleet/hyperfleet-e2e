@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Update latency",
 		})
 
 		ginkgo.It("should update a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("PATCH /channels/{id}", config.ThresholdAPIUpdate, helper.DefaultSamples,
+			helper.MeasureMedianLatency("PATCH /channels/{id}", h.Cfg.APILatencyThreshold(config.ThresholdAPIUpdate), helper.DefaultSamples,
 				func(i int) {
 					_, err := h.Client.PatchChannel(ctx, channelID, client.ResourcePatchRequest{
 						Spec: map[string]any{

@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("[Suite: channel][perf] API list latency",
 		})
 
 		ginkgo.It("should list channels within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels", config.ThresholdAPIList, helper.DefaultSamples,
+			helper.MeasureMedianLatency("GET /channels", h.Cfg.APILatencyThreshold(config.ThresholdAPIList), helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListChannels(ctx, "")
 					Expect(err).NotTo(HaveOccurred())
