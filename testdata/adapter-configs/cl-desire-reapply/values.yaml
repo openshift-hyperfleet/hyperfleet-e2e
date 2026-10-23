@@ -1,0 +1,58 @@
+# Values for the delete-then-reapply spec's adapter (HYPERFLEET-1776). The
+# same shape as the other test adapters (for example cl-stuck), plus the two
+# desire manifests next to the task config, and a pod label that admits the
+# adapter to the desire store's Redis (the spec creates a NetworkPolicy
+# matching it, see helper.AdmitDesireStoreClient).
+adapterConfig:
+  create: true
+  files:
+    adapter-config.yaml: cl-desire-reapply/adapter-config.yaml
+  log:
+    level: debug
+
+adapterTaskConfig:
+  create: true
+  files:
+    task-config.yaml: cl-desire-reapply/adapter-task-config.yaml
+    namespace.yaml: cl-desire-reapply/namespace.yaml
+    configmap.yaml: cl-desire-reapply/configmap.yaml
+
+broker:
+  type: ${BROKER_TYPE}
+  create: true
+  googlepubsub:
+    projectId: ${GCP_PROJECT_ID}
+    subscriptionId: ${NAMESPACE}-clusters-${ADAPTER_NAME}
+    topic: ${NAMESPACE}-clusters
+    deadLetterTopic: ${NAMESPACE}-clusters-dlq
+    createTopicIfMissing: ${ADAPTER_GOOGLEPUBSUB_CREATE_TOPIC_IF_MISSING}
+    createSubscriptionIfMissing: ${ADAPTER_GOOGLEPUBSUB_CREATE_SUBSCRIPTION_IF_MISSING}
+    expirationTTL: "1d"
+  rabbitmq:
+    url: ${RABBITMQ_URL}
+    queue: ${NAMESPACE}-clusters-${ADAPTER_NAME}
+    exchange: ${NAMESPACE}-clusters
+    routingKey: ${ADAPTER_NAME}
+
+image:
+  registry: ${IMAGE_REGISTRY}
+  repository: ${ADAPTER_IMAGE_REPO}
+  pullPolicy: Always
+  tag: ${ADAPTER_IMAGE_TAG}
+
+# The remote transport only reaches the desire store and the API, so unlike
+# the direct adapters this one needs no Kubernetes RBAC for its resources.
+rbac:
+  create: false
+
+labels:
+  e2e.hyperfleet.io/run-id: ${RUN_ID}
+
+# RUN_ID feeds the adapter's runId param, which stamps the run-id label on the
+# objects it creates (envsubst expands it here at deploy time).
+env:
+  - name: RUN_ID
+    value: ${RUN_ID}
+# TODO(HYPERFLEET-1825): remove this with the NetworkPolicy removal once the Desire Store runs behind the gateway
+podLabels:
+  e2e.hyperfleet.io/desire-store-client: "true"

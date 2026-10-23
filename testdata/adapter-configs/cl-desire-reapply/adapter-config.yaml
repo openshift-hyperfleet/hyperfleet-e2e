@@ -1,0 +1,42 @@
+adapter:
+  name: cl-desire-reapply
+
+# Log the full merged configuration after load (default: false)
+debug_config: false
+log:
+  level: debug
+
+clients:
+  hyperfleet_api:
+    base_url: CHANGE_ME
+    version: v1
+    timeout: 2s
+    retry_attempts: 3
+    retry_backoff: exponential
+
+  broker:
+    subscription_id: CHANGE_ME
+    topic: CHANGE_ME
+
+  kubernetes:
+    api_version: "v1"
+
+# The desire store deployed with the environment: Redis in the run namespace,
+# without authentication (hyperfleet-infra helmfile.yaml.gotmpl desireStoreUrl).
+stores:
+  remote-store:
+    type: redis
+    url: redis://redis:6379/0
+
+transports:
+  remote-primary:
+    type: remote
+    store: remote-store
+    # The applier serves the store partition named after the run namespace
+    # (config.managementCluster in the infra applier values), so the target
+    # must render as that namespace. DeployAdapter expands ${NAMESPACE} in
+    # this file with the run's namespace.
+    target_cluster: "${NAMESPACE}"
+    resource_plurals:
+      "v1/Namespace": namespaces
+      "v1/ConfigMap": configmaps
