@@ -1,7 +1,6 @@
 .DEFAULT_GOAL := help
 
 GO ?= go
-GOFMT ?= gofmt
 TOOL_MOD := tools/go.mod
 gotool = "$(GO)" tool -modfile="$(TOOL_MOD)" $(1)
 
@@ -74,7 +73,7 @@ FLAKE_ATTEMPTS ?= 2
 
 .PHONY: test
 test: generate ## Run unit tests
-	$(GO) test -v -race -cover -coverprofile=coverage.out ./pkg/...
+	$(GO) test -v -race -cover -coverprofile=coverage.out ./pkg/... ./cmd/...
 
 .PHONY: test-coverage
 test-coverage: test ## Run tests and generate HTML coverage report
@@ -113,16 +112,17 @@ list-tests: build ## List E2E tests by tier without executing (dry-run)
 
 .PHONY: fmt
 fmt: ## Format Go code
-	$(GOFMT) -s -w .
+	$(call gotool,golangci-lint) fmt ./...
 
 .PHONY: fmt-check
 fmt-check: ## Check if code is formatted
-	@diff=$$($(GOFMT) -s -d .); \
+	@status=0; diff=$$($(call gotool,golangci-lint) fmt --diff ./...) || status=$$?; \
 	if [ -n "$$diff" ]; then \
 		echo "Code is not formatted. Run 'make fmt' to fix:"; \
 		echo "$$diff"; \
 		exit 1; \
-	fi
+	fi; \
+	exit $$status
 
 .PHONY: vet
 vet: generate ## Run go vet
