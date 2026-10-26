@@ -21,14 +21,20 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Create latency",
 		})
 
 		ginkgo.It("should create a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /channels", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Channel").Thresholds.Create), helper.DefaultSamples,
+			helper.MeasureMedianLatency(
+				"POST /channels",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("Channel").Thresholds.Create),
+				helper.DefaultSamples,
 				func(int) {
-					channel, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
-					if channel != nil && channel.Id != nil {
-						h.DeferCleanup(h.Entities.MustGet("Channel"), "", *channel.Id)
+					channel, err := h.Client.CreateChannelFromPayload(
+						ctx,
+						h.TestDataPath("payloads/channels/channel-request.json"),
+					)
+					if channel != nil && channel.ID != nil {
+						h.DeferCleanup(h.Entities.MustGet("Channel"), "", *channel.ID)
 					}
 					Expect(err).NotTo(HaveOccurred())
-					Expect(channel.Id).NotTo(BeNil(), "channel ID should be set")
+					Expect(channel.ID).NotTo(BeNil(), "channel ID should be set")
 				},
 			)
 		})

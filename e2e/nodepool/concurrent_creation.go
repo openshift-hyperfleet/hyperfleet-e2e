@@ -15,7 +15,8 @@ import (
 
 const concurrentNodePoolCount = 3
 
-var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can coexist under same cluster without conflicts",
+var _ = ginkgo.Describe(
+	"[Suite: nodepool][concurrent] Multiple nodepools can coexist under same cluster without conflicts",
 	ginkgo.Label(labels.Tier1),
 	func() {
 		var h *helper.Helper
@@ -28,20 +29,26 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 
 			// Get or create a cluster for nodepool tests
 			var err error
-			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(
+				ctx,
+				h.Entities.MustGet("Cluster"),
+				"",
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to get test cluster")
 			ginkgo.GinkgoWriter.Printf("Using cluster ID: %s\n", clusterID)
 
 		})
 
-		ginkgo.It("should create multiple nodepools under the same cluster and all reach Reconciled state with isolated resources",
+		ginkgo.It(
+			"should create multiple nodepools under the same cluster and all reach Reconciled state with isolated resources",
 			func(ctx context.Context) {
 				ginkgo.By(fmt.Sprintf("Submit %d nodepool creation requests simultaneously", concurrentNodePoolCount))
 
 				type nodepoolResult struct {
+					err  error
 					id   string
 					name string
-					err  error
 				}
 
 				results := make([]nodepoolResult, concurrentNodePoolCount)
@@ -53,17 +60,21 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 						defer wg.Done()
 						defer ginkgo.GinkgoRecover()
 
-						nodepool, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
+						nodepool, err := h.Client.CreateNodePoolFromPayload(
+							ctx,
+							clusterID,
+							h.TestDataPath("payloads/nodepools/nodepool-request.json"),
+						)
 						if err != nil {
 							results[idx] = nodepoolResult{err: fmt.Errorf("failed to create nodepool %d: %w", idx, err)}
 							return
 						}
-						if nodepool.Id == nil {
+						if nodepool.ID == nil {
 							results[idx] = nodepoolResult{err: fmt.Errorf("nodepool %d has nil ID", idx)}
 							return
 						}
 						results[idx] = nodepoolResult{
-							id:   *nodepool.Id,
+							id:   *nodepool.ID,
 							name: nodepool.Name,
 						}
 					}(i)
@@ -91,8 +102,8 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 
 				listedIDs := make(map[string]bool)
 				for _, np := range nodepoolList.Items {
-					if np.Id != nil {
-						listedIDs[*np.Id] = true
+					if np.ID != nil {
+						listedIDs[*np.ID] = true
 					}
 				}
 				for i, npID := range nodepoolIDs {
@@ -104,7 +115,11 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 				ginkgo.By("Wait for all nodepools to reach Reconciled=True and Available=True")
 				for i, npID := range nodepoolIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for nodepool %d (%s) to become Reconciled...\n", i, npID)
-					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(
+						h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, npID),
+						h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+						h.Cfg.Polling.Interval,
+					).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					np, err := h.Client.GetNodePool(ctx, clusterID, npID)
@@ -135,8 +150,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 				for i, npID := range nodepoolIDs {
 					Eventually(func(g Gomega) {
 						statuses, err := h.Client.GetNodePoolStatuses(ctx, clusterID, npID)
-						g.Expect(err).NotTo(HaveOccurred(), "failed to get nodepool statuses for nodepool %d (%s)", i, npID)
-						g.Expect(statuses.Items).NotTo(BeEmpty(), "nodepool %d (%s) should have adapter statuses", i, npID)
+						g.Expect(err).
+							NotTo(HaveOccurred(), "failed to get nodepool statuses for nodepool %d (%s)", i, npID)
+						g.Expect(statuses.Items).
+							NotTo(BeEmpty(), "nodepool %d (%s) should have adapter statuses", i, npID)
 
 						adapterMap := make(map[string]client.AdapterStatus)
 						for _, adapter := range statuses.Items {
@@ -165,9 +182,13 @@ var _ = ginkgo.Describe("[Suite: nodepool][concurrent] Multiple nodepools can co
 					ginkgo.GinkgoWriter.Printf("Nodepool %d (%s) has all adapter statuses complete\n", i, npID)
 				}
 
-				ginkgo.GinkgoWriter.Printf("Successfully validated %d nodepools coexisting under cluster %s with resource isolation\n",
-					concurrentNodePoolCount, clusterID)
-			})
+				ginkgo.GinkgoWriter.Printf(
+					"Successfully validated %d nodepools coexisting under cluster %s with resource isolation\n",
+					concurrentNodePoolCount,
+					clusterID,
+				)
+			},
+		)
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if h == nil || clusterID == "" {

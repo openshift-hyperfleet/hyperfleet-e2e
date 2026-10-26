@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/util"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/pointer"
 
 	"log/slog"
 )
@@ -15,7 +15,7 @@ func (c *HyperFleetClient) CreateChannel(ctx context.Context, req ResourceCreate
 	if err != nil {
 		return nil, fmt.Errorf("create channel %q: %w", req.Name, err)
 	}
-	slog.Info("channel created", "channel_id", util.FromPtr(channel.Id), "name", req.Name)
+	slog.Info("channel created", "channel_id", pointer.FromPtr(channel.ID), "name", req.Name)
 	return channel, nil
 }
 
@@ -37,7 +37,11 @@ func (c *HyperFleetClient) DeleteChannel(ctx context.Context, channelID string) 
 	return channel, nil
 }
 
-func (c *HyperFleetClient) PatchChannel(ctx context.Context, channelID string, req ResourcePatchRequest) (*Resource, error) {
+func (c *HyperFleetClient) PatchChannel(
+	ctx context.Context,
+	channelID string,
+	req ResourcePatchRequest,
+) (*Resource, error) {
 	slog.Info("patching channel", "channel_id", channelID)
 	channel, err := c.PatchResource(ctx, ChannelsPath+"/"+channelID, req)
 	if err != nil {

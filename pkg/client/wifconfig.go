@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/util"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/pointer"
 
 	"log/slog"
 )
@@ -15,7 +15,7 @@ func (c *HyperFleetClient) CreateWifConfig(ctx context.Context, req ResourceCrea
 	if err != nil {
 		return nil, fmt.Errorf("create wifconfig %q: %w", req.Name, err)
 	}
-	slog.Info("wifconfig created", "wifconfig_id", util.FromPtr(wifConfig.Id), "name", req.Name)
+	slog.Info("wifconfig created", "wifconfig_id", pointer.FromPtr(wifConfig.ID), "name", req.Name)
 	return wifConfig, nil
 }
 
@@ -37,7 +37,11 @@ func (c *HyperFleetClient) DeleteWifConfig(ctx context.Context, wifConfigID stri
 	return wifConfig, nil
 }
 
-func (c *HyperFleetClient) PatchWifConfig(ctx context.Context, wifConfigID string, req ResourcePatchRequest) (*Resource, error) {
+func (c *HyperFleetClient) PatchWifConfig(
+	ctx context.Context,
+	wifConfigID string,
+	req ResourcePatchRequest,
+) (*Resource, error) {
 	slog.Info("patching wifconfig", "wifconfig_id", wifConfigID)
 	wifConfig, err := c.PatchResource(ctx, WifConfigsPath+"/"+wifConfigID, req)
 	if err != nil {

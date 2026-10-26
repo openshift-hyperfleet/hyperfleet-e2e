@@ -34,7 +34,10 @@ type HelmChartCloneOptions struct {
 
 // CloneHelmChart clones a Helm chart repository using sparse checkout to minimize download size.
 // It returns the full path to the cloned chart and a cleanup function.
-func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions) (chartPath string, cleanup func() error, err error) {
+func (h *Helper) CloneHelmChart(
+	ctx context.Context,
+	opts HelmChartCloneOptions,
+) (chartPath string, cleanup func() error, err error) {
 	// Validate required fields
 	if opts.Component == "" {
 		return "", nil, fmt.Errorf("component is required")
@@ -53,16 +56,16 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 	workDir := opts.WorkDir
 	if workDir == "" {
 		// Default to ./.test-work in current directory
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to get current directory: %w", err)
+		cwd, getwdErr := os.Getwd()
+		if getwdErr != nil {
+			return "", nil, fmt.Errorf("failed to get current directory: %w", getwdErr)
 		}
 		workDir = filepath.Join(cwd, TestWorkDir)
 	}
 
 	// Ensure work directory exists before cloning
-	if err := os.MkdirAll(workDir, 0750); err != nil {
-		return "", nil, fmt.Errorf("failed to create work directory: %w", err)
+	if mkdirErr := os.MkdirAll(workDir, 0750); mkdirErr != nil {
+		return "", nil, fmt.Errorf("failed to create work directory: %w", mkdirErr)
 	}
 
 	// Create an isolated component-specific directory per invocation
@@ -79,6 +82,12 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 			return fmt.Errorf("failed to remove cloned chart directory: %w", err)
 		}
 		return nil
+	}
+	cleanupOnFailure := func() {
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			// Keep the original clone/checkout error as the result, but report cleanup failures.
+			slog.Warn("failed to clean up chart after clone failure", "error", cleanupErr)
+		}
 	}
 
 	// Redact credentials from RepoURL before logging
@@ -107,7 +116,7 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 		componentDir)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
+		cleanupOnFailure()
 		return "", nil, fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
 	}
 
@@ -118,15 +127,21 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 	cmd = exec.CommandContext(ctx, "git", "sparse-checkout", "init", "--no-cone")
 	cmd.Dir = componentDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
+		cleanupOnFailure()
 		return "", nil, fmt.Errorf("sparse-checkout init failed: %w\nOutput: %s", err, string(output))
 	}
 
 	// Set sparse checkout path
-	cmd = exec.CommandContext(ctx, "git", "sparse-checkout", "set", opts.ChartPath) // #nosec G204 -- opts.ChartPath is from trusted config
+	cmd = exec.CommandContext(
+		ctx,
+		"git",
+		"sparse-checkout",
+		"set",
+		opts.ChartPath,
+	) // #nosec G204 -- opts.ChartPath is from trusted config
 	cmd.Dir = componentDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
+		cleanupOnFailure()
 		return "", nil, fmt.Errorf("sparse-checkout set failed: %w\nOutput: %s", err, string(output))
 	}
 
@@ -135,7 +150,7 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 	cmd = exec.CommandContext(ctx, "git", "checkout", opts.Ref) // #nosec G204 -- opts.Ref is from trusted config
 	cmd.Dir = componentDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		_ = cleanup()
+		cleanupOnFailure()
 		return "", nil, fmt.Errorf("git checkout failed: %w\nOutput: %s", err, string(output))
 	}
 
@@ -143,7 +158,7 @@ func (h *Helper) CloneHelmChart(ctx context.Context, opts HelmChartCloneOptions)
 	fullChartPath := filepath.Join(componentDir, opts.ChartPath)
 	chartYamlPath := filepath.Join(fullChartPath, "Chart.yaml")
 	if _, err := os.Stat(chartYamlPath); err != nil {
-		_ = cleanup()
+		cleanupOnFailure()
 		return "", nil, fmt.Errorf("chart.yaml not found at %s (verify ChartPath is correct): %w", fullChartPath, err)
 	}
 

@@ -18,22 +18,22 @@ const apiPrefix = "/api/hyperfleet/v1/"
 
 // Resource represents a generic HyperFleet API resource.
 type Resource struct {
-	Id              *string           `json:"id,omitempty"`
-	Kind            string            `json:"kind"`
-	Name            string            `json:"name"`
+	OwnerReferences *ObjectReference  `json:"owner_references,omitempty"`
+	CreatedTime     *time.Time        `json:"created_time,omitempty"`
+	ResourceVersion *string           `json:"resource_version,omitempty"`
 	Href            *string           `json:"href,omitempty"`
 	Spec            map[string]any    `json:"spec,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
-	Generation      int32             `json:"generation"`
-	Status          ResourceStatus    `json:"status"`
-	OwnerReferences *ObjectReference  `json:"owner_references,omitempty"`
-	CreatedTime     *time.Time        `json:"created_time,omitempty"`
+	DeletedBy       *string           `json:"deleted_by,omitempty"`
+	UpdatedBy       *string           `json:"updated_by,omitempty"`
+	ID              *string           `json:"id,omitempty"`
+	CreatedBy       *string           `json:"created_by,omitempty"`
 	UpdatedTime     *time.Time        `json:"updated_time,omitempty"`
 	DeletedTime     *time.Time        `json:"deleted_time,omitempty"`
-	CreatedBy       *string           `json:"created_by,omitempty"`
-	UpdatedBy       *string           `json:"updated_by,omitempty"`
-	DeletedBy       *string           `json:"deleted_by,omitempty"`
-	ResourceVersion *string           `json:"resource_version,omitempty"`
+	Kind            string            `json:"kind"`
+	Name            string            `json:"name"`
+	Status          ResourceStatus    `json:"status"`
+	Generation      int32             `json:"generation"`
 }
 
 // ResourceList is a paginated list of resources.
@@ -46,10 +46,10 @@ type ResourceList struct {
 
 // ResourceCreateRequest is the payload for creating a resource.
 type ResourceCreateRequest struct {
-	Kind   string            `json:"kind"`
-	Name   string            `json:"name"`
 	Spec   map[string]any    `json:"spec"`
 	Labels map[string]string `json:"labels,omitempty"`
+	Kind   string            `json:"kind"`
+	Name   string            `json:"name"`
 }
 
 // ResourcePatchRequest is the payload for patching a resource.
@@ -65,14 +65,14 @@ type ResourceStatus struct {
 
 // ResourceCondition represents a single status condition on a resource.
 type ResourceCondition struct {
-	Type               string                  `json:"type"`
-	Status             ResourceConditionStatus `json:"status"`
-	ObservedGeneration int32                   `json:"observed_generation"`
-	Reason             *string                 `json:"reason,omitempty"`
-	Message            *string                 `json:"message,omitempty"`
 	CreatedTime        time.Time               `json:"created_time"`
 	LastTransitionTime time.Time               `json:"last_transition_time"`
 	LastUpdatedTime    time.Time               `json:"last_updated_time"`
+	Reason             *string                 `json:"reason,omitempty"`
+	Message            *string                 `json:"message,omitempty"`
+	Type               string                  `json:"type"`
+	Status             ResourceConditionStatus `json:"status"`
+	ObservedGeneration int32                   `json:"observed_generation"`
 }
 
 // ResourceConditionStatus is the status value for resource conditions.
@@ -85,11 +85,11 @@ const (
 
 // AdapterCondition represents a single status condition reported by an adapter.
 type AdapterCondition struct {
-	Type               string                 `json:"type"`
-	Status             AdapterConditionStatus `json:"status"`
+	LastTransitionTime time.Time              `json:"last_transition_time"`
 	Reason             *string                `json:"reason,omitempty"`
 	Message            *string                `json:"message,omitempty"`
-	LastTransitionTime time.Time              `json:"last_transition_time"`
+	Type               string                 `json:"type"`
+	Status             AdapterConditionStatus `json:"status"`
 }
 
 // AdapterConditionStatus is the status value for adapter conditions.
@@ -102,13 +102,13 @@ const (
 
 // AdapterStatus represents the complete status report from an adapter.
 type AdapterStatus struct {
-	Adapter            string             `json:"adapter"`
-	Conditions         []AdapterCondition `json:"conditions"`
-	ObservedGeneration int32              `json:"observed_generation"`
 	CreatedTime        time.Time          `json:"created_time"`
 	LastReportTime     time.Time          `json:"last_report_time"`
 	Data               map[string]any     `json:"data,omitempty"`
 	Metadata           *AdapterMetadata   `json:"metadata,omitempty"`
+	Adapter            string             `json:"adapter"`
+	Conditions         []AdapterCondition `json:"conditions"`
+	ObservedGeneration int32              `json:"observed_generation"`
 }
 
 // AdapterMetadata holds job execution metadata for an adapter status.
@@ -137,7 +137,7 @@ type ForceDeleteRequest struct {
 // ObjectReference identifies a related resource.
 type ObjectReference struct {
 	Href *string `json:"href,omitempty"`
-	Id   *string `json:"id,omitempty"`
+	ID   *string `json:"id,omitempty"`
 	Kind string  `json:"kind"`
 }
 
@@ -170,7 +170,11 @@ func (c *HyperFleetClient) ListResources(ctx context.Context, path string, searc
 	return handleHTTPResponse[ResourceList](resp, http.StatusOK, "list resources at "+path)
 }
 
-func (c *HyperFleetClient) ListResourcesWithParams(ctx context.Context, path string, params url.Values) (*ResourceList, error) {
+func (c *HyperFleetClient) ListResourcesWithParams(
+	ctx context.Context,
+	path string,
+	params url.Values,
+) (*ResourceList, error) {
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
@@ -197,7 +201,11 @@ func (c *HyperFleetClient) PatchResource(ctx context.Context, path string, body 
 	return handleHTTPResponse[Resource](resp, http.StatusOK, "patch resource at "+path)
 }
 
-func (c *HyperFleetClient) CreateResourceFromPayload(ctx context.Context, path string, payloadPath string) (*Resource, error) {
+func (c *HyperFleetClient) CreateResourceFromPayload(
+	ctx context.Context,
+	path string,
+	payloadPath string,
+) (*Resource, error) {
 	slog.Debug("loading resource payload", "path", path, "payload_path", payloadPath)
 
 	payload, err := loadPayloadFromFile[map[string]any](payloadPath)
@@ -208,7 +216,12 @@ func (c *HyperFleetClient) CreateResourceFromPayload(ctx context.Context, path s
 	return c.CreateResource(ctx, path, payload)
 }
 
-func (c *HyperFleetClient) CreateResourceFromPayloadWith(ctx context.Context, path string, payloadPath string, overrides map[string]any) (*Resource, error) {
+func (c *HyperFleetClient) CreateResourceFromPayloadWith(
+	ctx context.Context,
+	path string,
+	payloadPath string,
+	overrides map[string]any,
+) (*Resource, error) {
 	slog.Debug("loading resource payload", "path", path, "payload_path", payloadPath)
 
 	payload, err := loadPayloadFromFile[map[string]any](payloadPath)
@@ -220,7 +233,11 @@ func (c *HyperFleetClient) CreateResourceFromPayloadWith(ctx context.Context, pa
 	return c.CreateResource(ctx, path, payload)
 }
 
-func (c *HyperFleetClient) PatchResourceFromPayload(ctx context.Context, path string, payloadPath string) (*Resource, error) {
+func (c *HyperFleetClient) PatchResourceFromPayload(
+	ctx context.Context,
+	path string,
+	payloadPath string,
+) (*Resource, error) {
 	slog.Debug("loading resource patch payload", "path", path, "payload_path", payloadPath)
 
 	payload, err := loadPayloadFromFile[map[string]any](payloadPath)
@@ -252,7 +269,7 @@ func (c *HyperFleetClient) GetResourceHTTPStatus(ctx context.Context, path strin
 	if err != nil {
 		return 0, fmt.Errorf("get resource HTTP status at %s: %w", path, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer closeResponseBody(resp.Body)
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		return resp.StatusCode, fmt.Errorf("drain response body at %s: %w", path, err)
 	}

@@ -25,10 +25,19 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Re-DELETE Idempotency and API 
 
 			ginkgo.By("creating cluster and waiting for Reconciled")
 			var err error
-			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(
+				ctx,
+				h.Entities.MustGet("Cluster"),
+				"",
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -36,12 +45,20 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Re-DELETE Idempotency and API 
 			ginkgo.Label(labels.Disruptive),
 			func(ctx context.Context) {
 				ginkgo.By("Scaling down sentinel cluster instances to prevent hard-delete between DELETE calls")
-				err := h.ScaleDeploymentBySelector(ctx, h.Cfg.Namespace, "app.kubernetes.io/instance in (sentinel-clusters,clusters)", 0)
+				err := h.ScaleDeploymentBySelector(
+					ctx,
+					h.Cfg.Namespace,
+					"app.kubernetes.io/instance in (sentinel-clusters,clusters)",
+					0,
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to scale sentinel to 0")
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("restoring sentinel-clusters to 1 replica")
-					if err := h.ScaleDeploymentBySelector(ctx, h.Cfg.Namespace, "app.kubernetes.io/instance in (sentinel-clusters,clusters)", 1); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to restore sentinel: %v\n", err)
+					scaleErr := h.ScaleDeploymentBySelector(
+						ctx, h.Cfg.Namespace, "app.kubernetes.io/instance in (sentinel-clusters,clusters)", 1,
+					)
+					if scaleErr != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to restore sentinel: %v\n", scaleErr)
 					}
 				})
 
@@ -56,8 +73,12 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Re-DELETE Idempotency and API 
 				secondDelete, err := h.Client.DeleteCluster(ctx, clusterID)
 				Expect(err).NotTo(HaveOccurred(), "second DELETE should succeed with 202")
 				Expect(secondDelete.DeletedTime).NotTo(BeNil(), "second DELETE should still have deleted_time")
-				Expect(*secondDelete.DeletedTime).To(Equal(originalDeletedTime), "deleted_time should not change on re-DELETE")
-				Expect(secondDelete.Generation).To(Equal(originalGeneration), "generation should not increment on re-DELETE")
+				Expect(
+					*secondDelete.DeletedTime,
+				).To(Equal(originalDeletedTime), "deleted_time should not change on re-DELETE")
+				Expect(
+					secondDelete.Generation,
+				).To(Equal(originalGeneration), "generation should not increment on re-DELETE")
 			})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -87,38 +108,56 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] DELETE During Update Reconcili
 			h = helper.New()
 
 			ginkgo.By("creating cluster and waiting for Reconciled at generation 1")
-			cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			cluster, err := h.Client.CreateClusterFromPayload(
+				ctx,
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-			Expect(cluster.Id).NotTo(BeNil())
-			clusterID = *cluster.Id
+			Expect(cluster.ID).NotTo(BeNil())
+			clusterID = *cluster.ID
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
-		ginkgo.It("should complete deletion when DELETE is sent during update reconciliation", func(ctx context.Context) {
-			ginkgo.By("sending PATCH to trigger generation 2 (do NOT wait for reconciliation)")
-			patchedCluster, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
-				Spec: map[string]any{"trigger-update": "true"},
-			})
-			Expect(err).NotTo(HaveOccurred(), "PATCH should succeed")
-			Expect(patchedCluster.Generation).To(Equal(int32(2)))
+		ginkgo.It(
+			"should complete deletion when DELETE is sent during update reconciliation",
+			func(ctx context.Context) {
+				ginkgo.By("sending PATCH to trigger generation 2 (do NOT wait for reconciliation)")
+				patchedCluster, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
+					Spec: map[string]any{"trigger-update": "true"},
+				})
+				Expect(err).NotTo(HaveOccurred(), "PATCH should succeed")
+				Expect(patchedCluster.Generation).To(Equal(int32(2)))
 
-			ginkgo.By("immediately sending DELETE before update reconciliation completes")
-			deletedCluster, err := h.Client.DeleteCluster(ctx, clusterID)
-			Expect(err).NotTo(HaveOccurred(), "DELETE should succeed with 202")
-			Expect(deletedCluster.DeletedTime).NotTo(BeNil())
-			Expect(deletedCluster.Generation).To(Equal(int32(3)),
-				"generation should be 3: create(1) + PATCH(2) + DELETE(3)")
+				ginkgo.By("immediately sending DELETE before update reconciliation completes")
+				deletedCluster, err := h.Client.DeleteCluster(ctx, clusterID)
+				Expect(err).NotTo(HaveOccurred(), "DELETE should succeed with 202")
+				Expect(deletedCluster.DeletedTime).NotTo(BeNil())
+				Expect(deletedCluster.Generation).To(Equal(int32(3)),
+					"generation should be 3: create(1) + PATCH(2) + DELETE(3)")
 
-			ginkgo.By("verifying cluster is hard-deleted")
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(Equal(http.StatusNotFound))
+				ginkgo.By("verifying cluster is hard-deleted")
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
+					Should(Equal(http.StatusNotFound))
 
-			ginkgo.By("verifying downstream K8s namespace is cleaned up")
-			Eventually(h.PollNamespacesByPrefix(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(BeEmpty())
-		})
+				ginkgo.By("verifying downstream K8s namespace is cleaned up")
+				Eventually(
+					h.PollNamespacesByPrefix(ctx, clusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
+					Should(BeEmpty())
+			},
+		)
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if h == nil || clusterID == "" {
@@ -149,55 +188,77 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Recreate Cluster After Hard-De
 			h = helper.New()
 
 			ginkgo.By("creating first cluster and waiting for Reconciled")
-			cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			cluster, err := h.Client.CreateClusterFromPayload(
+				ctx,
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-			Expect(cluster.Id).NotTo(BeNil())
-			firstClusterID = *cluster.Id
+			Expect(cluster.ID).NotTo(BeNil())
+			firstClusterID = *cluster.ID
 			originalCluster = cluster
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", firstClusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("Cluster"), "", firstClusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
-		ginkgo.It("should create a new cluster with the same name after the original is hard-deleted", func(ctx context.Context) {
-			ginkgo.By("deleting the first cluster and waiting for hard-delete")
-			_, err := h.Client.DeleteCluster(ctx, firstClusterID)
-			Expect(err).NotTo(HaveOccurred())
+		ginkgo.It(
+			"should create a new cluster with the same name after the original is hard-deleted",
+			func(ctx context.Context) {
+				ginkgo.By("deleting the first cluster and waiting for hard-delete")
+				_, err := h.Client.DeleteCluster(ctx, firstClusterID)
+				Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", firstClusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(Equal(http.StatusNotFound))
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", firstClusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
+					Should(Equal(http.StatusNotFound))
 
-			ginkgo.By("waiting for namespace cleanup from first cluster")
-			Eventually(h.PollNamespacesByPrefix(ctx, firstClusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(BeEmpty())
+				ginkgo.By("waiting for namespace cleanup from first cluster")
+				Eventually(
+					h.PollNamespacesByPrefix(ctx, firstClusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
+					Should(BeEmpty())
 
-			ginkgo.By("creating a new cluster with the same name")
-			newCluster, err := h.Client.CreateCluster(ctx, client.ResourceCreateRequest{
-				Kind:   "Cluster",
-				Name:   originalCluster.Name,
-				Labels: originalCluster.Labels,
-				Spec:   originalCluster.Spec,
-			})
-			Expect(err).NotTo(HaveOccurred(), "creating cluster with reused name should succeed")
-			Expect(newCluster.Id).NotTo(BeNil())
-			secondClusterID = *newCluster.Id
+				ginkgo.By("creating a new cluster with the same name")
+				newCluster, err := h.Client.CreateCluster(ctx, client.ResourceCreateRequest{
+					Kind:   "Cluster",
+					Name:   originalCluster.Name,
+					Labels: originalCluster.Labels,
+					Spec:   originalCluster.Spec,
+				})
+				Expect(err).NotTo(HaveOccurred(), "creating cluster with reused name should succeed")
+				Expect(newCluster.ID).NotTo(BeNil())
+				secondClusterID = *newCluster.ID
 
-			Expect(secondClusterID).NotTo(Equal(firstClusterID),
-				"new cluster should have a different ID than the deleted one")
-			Expect(newCluster.Generation).To(Equal(int32(1)),
-				"new cluster should start at generation 1")
+				Expect(secondClusterID).NotTo(Equal(firstClusterID),
+					"new cluster should have a different ID than the deleted one")
+				Expect(newCluster.Generation).To(Equal(int32(1)),
+					"new cluster should start at generation 1")
 
-			ginkgo.By("waiting for the new cluster to reach Reconciled")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", secondClusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
-				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
+				ginkgo.By("waiting for the new cluster to reach Reconciled")
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", secondClusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
+					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-			ginkgo.By("verifying the old cluster is still gone")
-			_, err = h.Client.GetCluster(ctx, firstClusterID)
-			var httpErr *client.HTTPError
-			Expect(errors.As(err, &httpErr)).To(BeTrue())
-			Expect(httpErr.StatusCode).To(Equal(http.StatusNotFound),
-				"old cluster should remain 404 after recreate")
-		})
+				ginkgo.By("verifying the old cluster is still gone")
+				_, err = h.Client.GetCluster(ctx, firstClusterID)
+				var httpErr *client.HTTPError
+				Expect(errors.As(err, &httpErr)).To(BeTrue())
+				Expect(httpErr.StatusCode).To(Equal(http.StatusNotFound),
+					"old cluster should remain 404 after recreate")
+			},
+		)
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if h == nil {

@@ -52,7 +52,8 @@ func craftJWT(claims jwt.MapClaims) (string, error) {
 }
 
 // craftExpiredJWT creates a self-signed JWT that has already expired.
-// Random-key signed, so it can't isolate exp-checking from signature rejection (see AUT-002 note in jwt_enforcement.go).
+// Random-key signed, so it can't isolate exp-checking from signature rejection (see AUT-002 note in
+// jwt_enforcement.go).
 func craftExpiredJWT() (string, error) {
 	now := time.Now()
 	return craftJWT(jwt.MapClaims{

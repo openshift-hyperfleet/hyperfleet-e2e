@@ -15,32 +15,54 @@ import (
 var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smoke",
 	ginkgo.Label(labels.Tier0),
 	func() {
-		ginkgo.It("should complete create → Reconciled → update → re-Reconciled → delete → hard-delete in a single pass",
+		ginkgo.It(
+			"should complete create → Reconciled → update → re-Reconciled → delete → hard-delete in a single pass",
 			func(ctx context.Context) {
 				h := helper.New()
 
 				ginkgo.By("creating a parent cluster and waiting for Reconciled")
-				clusterID, err := h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+				clusterID, err := h.CreateTestResource(
+					ctx,
+					h.Entities.MustGet("Cluster"),
+					"",
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
-					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
+					if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); cleanupErr != nil {
+						ginkgo.GinkgoWriter.Printf(
+							"Warning: cleanup failed for cluster %s: %v\n",
+							clusterID,
+							cleanupErr,
+						)
 					}
 				})
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("creating a nodepool")
-				np, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
+				np, err := h.Client.CreateNodePoolFromPayload(
+					ctx,
+					clusterID,
+					h.TestDataPath("payloads/nodepools/nodepool-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "create should succeed")
 				Expect(np).NotTo(BeNil(), "create should return nodepool object")
-				Expect(np.Id).NotTo(BeNil(), "nodepool ID should be assigned")
-				nodepoolID := *np.Id
+				Expect(np.ID).NotTo(BeNil(), "nodepool ID should be assigned")
+				nodepoolID := *np.ID
 
 				ginkgo.By("waiting for Reconciled=True at generation 1")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+					h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("PATCHing nodepool spec to trigger generation bump")
@@ -56,7 +78,11 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 					h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
 					Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("NodePool").RequiredAdapters, int32(2)))
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+					h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("soft-deleting the nodepool")
@@ -78,6 +104,7 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Full Lifecycle Smo
 				Expect(parentCluster).To(helper.HaveResourceCondition(
 					client.ConditionTypeReconciled, client.ResourceConditionStatusTrue),
 					"parent cluster should remain Reconciled=True")
-			})
+			},
+		)
 	},
 )

@@ -27,30 +27,47 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				// --- Create resources in a healthy state ---
 
 				ginkgo.By("Create cluster and wait for Reconciled")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-				Expect(cluster.Id).NotTo(BeNil())
-				clusterID := *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil())
+				clusterID := *cluster.ID
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("Create a nodepool and wait for Reconciled")
-				np, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
+				np, err := h.Client.CreateNodePoolFromPayload(
+					ctx,
+					clusterID,
+					h.TestDataPath("payloads/nodepools/nodepool-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create nodepool")
-				Expect(np.Id).NotTo(BeNil())
-				nodepoolID := *np.Id
+				Expect(np.ID).NotTo(BeNil())
+				nodepoolID := *np.ID
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+					h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				// --- Simulate stuck deletion by scaling down an existing cluster adapter ---
 
-				Expect(h.Entities.MustGet("Cluster").RequiredAdapters).NotTo(BeEmpty(), "cluster adapter config is required for this test")
+				Expect(h.Entities.MustGet("Cluster").RequiredAdapters).NotTo(BeEmpty(),
+					"cluster adapter config is required for this test")
 				clAdapterName := h.Entities.MustGet("Cluster").RequiredAdapters[0]
-				// Standard adapters are deployed with release name = adapter name (e.g., "cl-namespace", not "adapter-clusters-cl-namespace")
+				// Standard adapters are deployed with release name = adapter name (e.g., "cl-namespace", not
+				// "adapter-clusters-cl-namespace")
 				clReleaseName := clAdapterName
 
 				deploymentName, err := h.GetDeploymentName(ctx, h.Cfg.Namespace, clReleaseName)
@@ -62,8 +79,12 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Restore cluster adapter to 1 replica")
-					if err := h.ScaleDeployment(ctx, h.Cfg.Namespace, deploymentName, 1); err != nil {
-						ginkgo.GinkgoWriter.Printf("CRITICAL: failed to restore cluster adapter %s: %v\n", clAdapterName, err)
+					if scaleErr := h.ScaleDeployment(ctx, h.Cfg.Namespace, deploymentName, 1); scaleErr != nil {
+						ginkgo.GinkgoWriter.Printf(
+							"CRITICAL: failed to restore cluster adapter %s: %v\n",
+							clAdapterName,
+							scaleErr,
+						)
 					}
 				})
 
@@ -75,8 +96,8 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				// Consistently proves the cluster remains stuck over time (not just a race)
 				ginkgo.By("Verify cluster is stuck in Finalizing (not hard-deleted)")
 				Consistently(func(g Gomega) {
-					cl, err := h.Client.GetCluster(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred(), "cluster should still be accessible")
+					cl, getErr := h.Client.GetCluster(ctx, clusterID)
+					g.Expect(getErr).NotTo(HaveOccurred(), "cluster should still be accessible")
 					g.Expect(cl.DeletedTime).NotTo(BeNil(), "cluster should still be soft-deleted")
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
 						client.ConditionTypeReconciled, client.ResourceConditionStatusFalse)).To(BeTrue(),
@@ -90,15 +111,27 @@ var _ = ginkgo.Describe("[Suite: cluster][delete] Force-Delete Cluster Stuck in 
 				Expect(err).NotTo(HaveOccurred(), "force-delete should succeed with 204")
 
 				ginkgo.By("Verify cluster is hard-deleted (404)")
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Deleted,
+					h.Cfg.Polling.Interval,
+				).
 					Should(Equal(http.StatusNotFound))
 
 				// Force-delete cascades: child nodepools are removed in the same transaction
 				ginkgo.By("Verify child nodepool is also removed (404)")
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
 					Should(Equal(http.StatusNotFound))
 
-				ginkgo.GinkgoWriter.Printf("Verified: force-delete removed cluster %s and nodepool %s\n", clusterID, nodepoolID)
+				ginkgo.GinkgoWriter.Printf(
+					"Verified: force-delete removed cluster %s and nodepool %s\n",
+					clusterID,
+					nodepoolID,
+				)
 			})
 	},
 )

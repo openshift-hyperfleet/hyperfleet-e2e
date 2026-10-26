@@ -62,9 +62,10 @@ const (
 	// DefaultHyperfleetAPIBaseURL is the in-cluster base URL for the HyperFleet API.
 	DefaultHyperfleetAPIBaseURL = "http://hyperfleet-gateway:8000"
 
-	// DefaultDesireAdapter is the remote-transport cluster adapter hyperfleet-infra deploys; it is one of the Cluster row's required adapters
+	// DefaultDesireAdapter is the remote-transport cluster adapter hyperfleet-infra deploys;
+	// it is one of the Cluster row's required adapters.
 	DefaultDesireAdapter = "cl-desire"
 
 	// DefaultBrokerType is the default broker type
-	DefaultBrokerType = "googlepubsub"
+	DefaultBrokerType = BrokerTypeGooglePubSub
 )

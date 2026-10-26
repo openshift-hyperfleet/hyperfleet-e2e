@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	pubsubadmin "cloud.google.com/go/pubsub/v2/apiv1"
 	pubsubpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
@@ -21,7 +23,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"log/slog"
 )
 
 type AdapterDeployment struct {
@@ -31,8 +32,8 @@ type AdapterDeployment struct {
 }
 
 type AdapterDeploymentList struct {
-	mu    sync.RWMutex
 	items []AdapterDeployment
+	mu    sync.RWMutex
 }
 
 func (l *AdapterDeploymentList) Add(deployment AdapterDeployment) {
@@ -74,19 +75,20 @@ func generateRandomString(length int) string {
 
 // AdapterDeploymentOptions contains configuration for deploying an adapter via Helm
 type AdapterDeploymentOptions struct {
+	SetValues   map[string]string // Additional Helm --set values
 	ReleaseName string
 	Namespace   string
 	ChartPath   string
 	AdapterName string
-	Timeout     time.Duration
-	SetValues   map[string]string // Additional Helm --set values
 	Entity      descriptor.EntityDescriptor
+	Timeout     time.Duration
 }
 
 // GenerateAdapterReleaseName generates a deterministic Helm release name for an adapter deployment.
 // The release name format is: adapter-<plural>-<adapter_name>
 // Deterministic naming allows helm upgrade --install to upgrade in place and avoids duplicate releases.
-// The name is truncated to 48 characters to leave room for Helm's deployment/pod suffixes (Kubernetes has a 63-char limit).
+// The name is truncated to 48 characters to leave room for Helm's deployment/pod suffixes (Kubernetes has a 63-char
+// limit).
 // If truncation is needed, a deterministic hash is appended to prevent collisions between long names.
 const maxReleaseNameLength = 48
 
@@ -117,7 +119,9 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 		return fmt.Errorf("AdapterDeploymentOptions.AdapterName is required")
 	}
 	if opts.ReleaseName == "" {
-		return fmt.Errorf("AdapterDeploymentOptions.ReleaseName is required - use GenerateAdapterReleaseName() to create a unique name")
+		return fmt.Errorf(
+			"AdapterDeploymentOptions.ReleaseName is required - use GenerateAdapterReleaseName() to create a unique name",
+		)
 	}
 	if opts.Entity.Plural == "" {
 		return fmt.Errorf("AdapterDeploymentOptions.Entity.Plural is required for Pub/Sub cleanup naming")
@@ -158,10 +162,15 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 
 	// Default BROKER_TYPE to googlepubsub if not set so envsubst produces a valid value
 	if os.Getenv("BROKER_TYPE") == "" {
-		if err := os.Setenv("BROKER_TYPE", "googlepubsub"); err != nil {
+		if err := os.Setenv("BROKER_TYPE", config.BrokerTypeGooglePubSub); err != nil {
 			return fmt.Errorf("failed to set default BROKER_TYPE: %w", err)
 		}
-		defer func() { _ = os.Unsetenv("BROKER_TYPE") }()
+		defer func() {
+			if unsetErr := os.Unsetenv("BROKER_TYPE"); unsetErr != nil {
+				// Environment restoration must not hide the deployment result.
+				slog.Warn("failed to restore BROKER_TYPE", "error", unsetErr)
+			}
+		}()
 	}
 
 	// Compute extra environment variables for the envsubst subprocess.
@@ -170,7 +179,8 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 
 	// When using GCP Pub/Sub, ensure the subscription is created if it doesn't exist.
 	// This is required for adapters deployed for the first time (no pre-existing subscription).
-	if os.Getenv("BROKER_TYPE") == "googlepubsub" && os.Getenv("ADAPTER_GOOGLEPUBSUB_CREATE_SUBSCRIPTION_IF_MISSING") == "" {
+	if os.Getenv("BROKER_TYPE") == config.BrokerTypeGooglePubSub &&
+		os.Getenv("ADAPTER_GOOGLEPUBSUB_CREATE_SUBSCRIPTION_IF_MISSING") == "" {
 		extraEnv = append(extraEnv, "ADAPTER_GOOGLEPUBSUB_CREATE_SUBSCRIPTION_IF_MISSING=true")
 	}
 
@@ -191,8 +201,8 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 	if err != nil {
 		return fmt.Errorf("failed to expand environment variables in values.yaml: %w", err)
 	}
-	if err := os.WriteFile(valuesFilePath, expandedContent, 0600); err != nil {
-		return fmt.Errorf("failed to overwrite values.yaml with expanded content: %w", err)
+	if writeErr := os.WriteFile(valuesFilePath, expandedContent, 0600); writeErr != nil {
+		return fmt.Errorf("failed to overwrite values.yaml with expanded content: %w", writeErr)
 	}
 
 	slog.Info("successfully expanded environment variables in values.yaml")
@@ -202,12 +212,12 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 	// so the correct API endpoint is injected at deploy time regardless of namespace.
 	adapterConfigPath := filepath.Join(destAdapterDir, "adapter-config.yaml")
 	if _, statErr := os.Stat(adapterConfigPath); statErr == nil {
-		expandedAdapterConfig, err := expandEnvVarsInYAMLToBytes(ctx, adapterConfigPath, extraEnv)
-		if err != nil {
-			return fmt.Errorf("failed to expand environment variables in adapter-config.yaml: %w", err)
+		expandedAdapterConfig, expandErr := expandEnvVarsInYAMLToBytes(ctx, adapterConfigPath, extraEnv)
+		if expandErr != nil {
+			return fmt.Errorf("failed to expand environment variables in adapter-config.yaml: %w", expandErr)
 		}
-		if err := os.WriteFile(adapterConfigPath, expandedAdapterConfig, 0600); err != nil {
-			return fmt.Errorf("failed to overwrite adapter-config.yaml with expanded content: %w", err)
+		if writeErr := os.WriteFile(adapterConfigPath, expandedAdapterConfig, 0600); writeErr != nil {
+			return fmt.Errorf("failed to overwrite adapter-config.yaml with expanded content: %w", writeErr)
 		}
 		slog.Info("successfully expanded environment variables in adapter-config.yaml")
 	}
@@ -238,7 +248,10 @@ func (h *Helper) DeployAdapter(ctx context.Context, opts AdapterDeploymentOption
 	defer cancel()
 
 	// Execute Helm command
-	cmd := exec.CommandContext(cmdCtx, "helm", helmArgs...) // #nosec G204 -- helmArgs is constructed from trusted config
+	cmd := exec.CommandContext(
+		cmdCtx,
+		"helm",
+		helmArgs...) // #nosec G204 -- helmArgs is constructed from trusted config
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Error("helm upgrade failed", "error", err, "output", string(output))
@@ -285,7 +298,11 @@ func (h *Helper) adapterHelmSetArgs(releaseName string, opts AdapterDeploymentOp
 	if h.Cfg.AdapterAuthEnabled() {
 		args = append(args, "--set", "adapterConfig.hyperfleetApi.auth.enabled=true")
 		if h.Cfg.AuthMode == config.AuthModeEdge || h.Cfg.AuthMode == config.AuthModeEdgeAPI {
-			args = append(args, "--set", "adapterConfig.hyperfleetApi.auth.scheme="+config.AuthorizationSchemeServiceAccount)
+			args = append(
+				args,
+				"--set",
+				"adapterConfig.hyperfleetApi.auth.scheme="+config.AuthorizationSchemeServiceAccount,
+			)
 		}
 	}
 
@@ -349,9 +366,16 @@ func (h *Helper) cleanupClusterScopedResources(ctx context.Context, releaseName 
 	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s", releaseName)
 
 	// Try to delete ClusterRole
-	clusterRoleCmd := exec.CommandContext(cmdCtx, "kubectl", "delete", "clusterrole", //nolint:gosec // labelSelector is derived from releaseName, not user input
-		"-l", labelSelector,
-		"--ignore-not-found=true")
+	//nolint:gosec // labelSelector is derived from releaseName, not user input.
+	clusterRoleCmd := exec.CommandContext(
+		cmdCtx,
+		"kubectl",
+		"delete",
+		"clusterrole",
+		"-l",
+		labelSelector,
+		"--ignore-not-found=true",
+	)
 	if output, err := clusterRoleCmd.CombinedOutput(); err != nil {
 		slog.Info("could not delete ClusterRole (may not exist)",
 			"release_name", releaseName,
@@ -361,9 +385,16 @@ func (h *Helper) cleanupClusterScopedResources(ctx context.Context, releaseName 
 	}
 
 	// Try to delete ClusterRoleBinding
-	clusterRoleBindingCmd := exec.CommandContext(cmdCtx, "kubectl", "delete", "clusterrolebinding", //nolint:gosec // labelSelector is derived from releaseName, not user input
-		"-l", labelSelector,
-		"--ignore-not-found=true")
+	//nolint:gosec // labelSelector is derived from releaseName, not user input.
+	clusterRoleBindingCmd := exec.CommandContext(
+		cmdCtx,
+		"kubectl",
+		"delete",
+		"clusterrolebinding",
+		"-l",
+		labelSelector,
+		"--ignore-not-found=true",
+	)
 	if output, err := clusterRoleBindingCmd.CombinedOutput(); err != nil {
 		slog.Info("could not delete ClusterRoleBinding (may not exist)",
 			"release_name", releaseName,
@@ -442,10 +473,15 @@ func (h *Helper) saveDiagnosticLogs(ctx context.Context, adapterName, releaseNam
 
 		// Save pod logs using kubectl command
 		podLogFile := filepath.Join(outputDir, fmt.Sprintf("%s.log", podName))
-		podLogCmd := exec.CommandContext(cmdCtx, "kubectl", "logs", // #nosec G204 -- podName and namespace are from trusted k8s API
+		podLogCmd := exec.CommandContext(
+			cmdCtx,
+			"kubectl",
+			"logs", // #nosec G204 -- podName and namespace are from trusted k8s API
 			podName,
-			"-n", namespace,
-			"--tail=200")
+			"-n",
+			namespace,
+			"--tail=200",
+		)
 
 		var logContent string
 		logContent += fmt.Sprintf("$ %s\n\n", podLogCmd.String())
@@ -457,10 +493,10 @@ func (h *Helper) saveDiagnosticLogs(ctx context.Context, adapterName, releaseNam
 			logContent += string(logOutput)
 		}
 
-		if err := os.WriteFile(podLogFile, []byte(logContent), 0600); err != nil {
+		if writeErr := os.WriteFile(podLogFile, []byte(logContent), 0600); writeErr != nil {
 			slog.Error("failed to write pod log file",
 				"pod", podName,
-				"error", err)
+				"error", writeErr)
 		} else {
 			slog.Info("saved pod logs",
 				"pod", podName,
@@ -469,9 +505,15 @@ func (h *Helper) saveDiagnosticLogs(ctx context.Context, adapterName, releaseNam
 
 		// Save pod description using kubectl describe command
 		podDescFile := filepath.Join(outputDir, fmt.Sprintf("%s-describe.txt", podName))
-		podDescCmd := exec.CommandContext(cmdCtx, "kubectl", "describe", "pod", // #nosec G204 -- podName and namespace are from trusted k8s API
+		podDescCmd := exec.CommandContext(
+			cmdCtx,
+			"kubectl",
+			"describe",
+			"pod", // #nosec G204 -- podName and namespace are from trusted k8s API
 			podName,
-			"-n", namespace)
+			"-n",
+			namespace,
+		)
 
 		var descContent string
 		descContent += fmt.Sprintf("$ %s\n\n", podDescCmd.String())
@@ -540,10 +582,10 @@ func expandEnvVarsInYAMLToBytes(ctx context.Context, yamlPath string, extraEnv [
 func (h *Helper) PurgeAdapterQueue(ctx context.Context, adapterName string) error {
 	brokerType := os.Getenv("BROKER_TYPE")
 	if brokerType == "" {
-		brokerType = "googlepubsub" // matches DeployAdapter's default
+		brokerType = config.BrokerTypeGooglePubSub // matches DeployAdapter's default
 	}
 	switch brokerType {
-	case "googlepubsub":
+	case config.BrokerTypeGooglePubSub:
 		subscriptionID := fmt.Sprintf("%s-clusters-%s", h.Cfg.Namespace, adapterName)
 		return DeletePubSubSubscription(ctx, subscriptionID, h.Cfg.GCPProjectID)
 	case "rabbitmq":
@@ -581,8 +623,18 @@ func (h *Helper) purgeRabbitMQQueue(ctx context.Context, adapterName string) err
 	}
 
 	podName := pods.Items[0].Name
-	cmd := exec.CommandContext(cmdCtx, "kubectl", "exec", "-n", rabbitMQNamespace, // #nosec G204 -- podName and queueName from trusted config
-		podName, "--", "rabbitmqctl", "purge_queue", queueName)
+	cmd := exec.CommandContext(
+		cmdCtx,
+		"kubectl",
+		"exec",
+		"-n",
+		rabbitMQNamespace, // #nosec G204 -- podName and queueName from trusted config
+		podName,
+		"--",
+		"rabbitmqctl",
+		"purge_queue",
+		queueName,
+	)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -598,7 +650,9 @@ func (h *Helper) purgeRabbitMQQueue(ctx context.Context, adapterName string) err
 	return nil
 }
 
-var newPubSubDeleteFunc = func(ctx context.Context, projectID, subID string) (func(context.Context) error, func(), error) {
+var newPubSubDeleteFunc = func(
+	ctx context.Context, projectID, subID string,
+) (func(context.Context) error, func(), error) {
 	client, err := pubsubadmin.NewSubscriptionAdminClient(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create Pub/Sub admin client: %w", err)
@@ -617,9 +671,17 @@ var newPubSubDeleteFunc = func(ctx context.Context, projectID, subID string) (fu
 }
 
 // DeletePubSubResourcesForAdapter deletes Pub/Sub subscription and dlq topic for a given adapter.
-func (h *Helper) DeletePubSubResourcesForAdapter(ctx context.Context, entity descriptor.EntityDescriptor, adapterName string) error {
-	if h.Cfg.BrokerType != "googlepubsub" {
-		slog.Info("skipping Pub/Sub subscription and topic deletion for non-Google Pub/Sub adapter", "adapter", adapterName)
+func (h *Helper) DeletePubSubResourcesForAdapter(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	adapterName string,
+) error {
+	if h.Cfg.BrokerType != config.BrokerTypeGooglePubSub {
+		slog.Info(
+			"skipping Pub/Sub subscription and topic deletion for non-Google Pub/Sub adapter",
+			"adapter",
+			adapterName,
+		)
 		return nil
 	}
 
@@ -636,7 +698,11 @@ func (h *Helper) DeletePubSubResourcesForAdapter(ctx context.Context, entity des
 		errorList = append(errorList, topicID)
 	}
 	if len(errorList) > 0 {
-		return fmt.Errorf("failed to delete some Pub/Sub resources for adapter %s: %s", adapterName, strings.Join(errorList, ", "))
+		return fmt.Errorf(
+			"failed to delete some Pub/Sub resources for adapter %s: %s",
+			adapterName,
+			strings.Join(errorList, ", "),
+		)
 	}
 	slog.Info("deleted Pub/Sub resources for adapter", "adapter", adapterName)
 	return nil
@@ -675,7 +741,9 @@ func DeletePubSubSubscription(ctx context.Context, subscriptionID string, projec
 	return nil
 }
 
-var newPubSubTopicDeleteFunc = func(ctx context.Context, projectID, topicID string) (func(context.Context) error, func(), error) {
+var newPubSubTopicDeleteFunc = func(
+	ctx context.Context, projectID, topicID string,
+) (func(context.Context) error, func(), error) {
 	client, err := pubsubadmin.NewTopicAdminClient(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create Pub/Sub topic admin client: %w", err)
@@ -735,8 +803,8 @@ func copyDir(src, dst string) error {
 	}
 
 	// Create destination directory
-	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
-		return err
+	if mkdirErr := os.MkdirAll(dst, srcInfo.Mode()); mkdirErr != nil {
+		return mkdirErr
 	}
 
 	// Read source directory contents

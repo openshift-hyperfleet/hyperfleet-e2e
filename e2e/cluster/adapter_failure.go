@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
+
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
@@ -80,16 +82,24 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				// Ensure adapter cleanup happens after this test
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Uninstall cl-param-error adapter")
-					if err := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", releaseName, err)
+					if uninstallErr := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); uninstallErr != nil {
+						ginkgo.GinkgoWriter.Printf(
+							"Warning: failed to uninstall adapter %s: %v\n",
+							releaseName,
+							uninstallErr,
+						)
 					} else {
 						ginkgo.GinkgoWriter.Printf("Successfully uninstalled adapter: %s\n", releaseName)
 					}
 
-					if h.Cfg.BrokerType == "googlepubsub" {
+					if h.Cfg.BrokerType == config.BrokerTypeGooglePubSub {
 						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); err != nil {
-							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
+						if deleteErr := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); deleteErr != nil {
+							ginkgo.GinkgoWriter.Printf(
+								"Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n",
+								adapterName,
+								deleteErr,
+							)
 						}
 					}
 				})
@@ -98,18 +108,21 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 
 				// Create cluster after adapter is deployed
 				ginkgo.By("Submit an API request to create a Cluster resource")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
+				Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be generated")
 				Expect(cluster.Name).NotTo(BeEmpty(), "cluster name should be present")
-				clusterID := *cluster.Id
+				clusterID := *cluster.ID
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				// Ensure cluster cleanup happens after this test
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Cleanup test cluster " + clusterID)
-					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); cleanupErr != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, cleanupErr)
 					}
 				})
 
@@ -120,8 +133,8 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				// Per ADR-0008, aggregated conditions evaluate only required adapters,
 				// so this adapter's failure does NOT prevent reconciliation.
 				Eventually(func(g Gomega) {
-					cl, err := h.Client.GetCluster(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster")
+					cl, getErr := h.Client.GetCluster(ctx, clusterID)
+					g.Expect(getErr).NotTo(HaveOccurred(), "failed to get cluster")
 					g.Expect(cl.Status).NotTo(BeNil(), "cluster status should be present")
 
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
@@ -149,7 +162,9 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reflect Adapter 
 				Expect(adapterStatus).To(BeNil(),
 					"adapter with required param extraction failure should not report status (post_actions never execute)")
 
-				ginkgo.GinkgoWriter.Printf("Verified: adapter status absent (required param failure), cluster reconciled normally\n")
+				ginkgo.GinkgoWriter.Printf(
+					"Verified: adapter status absent (required param failure), cluster reconciled normally\n",
+				)
 			})
 	},
 )

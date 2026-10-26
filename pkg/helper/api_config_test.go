@@ -18,18 +18,18 @@ func TestPatchEntityRequiredAdapters(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
 		vals     apiValues
+		name     string
 		kind     string
-		adapters []string
 		wantErr  string
+		adapters []string
 	}{
 		{
 			name: "patches matching entity",
 			vals: apiValues{
 				Config: struct {
-					Entities []apiEntity    `yaml:"entities"`
 					Rest     map[string]any `yaml:",inline"`
+					Entities []apiEntity    `yaml:"entities"`
 				}{
 					Entities: []apiEntity{
 						{Kind: "Cluster", RequiredAdapters: []string{"old-adapter"}},
@@ -43,8 +43,8 @@ func TestPatchEntityRequiredAdapters(t *testing.T) {
 			name: "entity kind not found",
 			vals: apiValues{
 				Config: struct {
-					Entities []apiEntity    `yaml:"entities"`
 					Rest     map[string]any `yaml:",inline"`
+					Entities []apiEntity    `yaml:"entities"`
 				}{
 					Entities: []apiEntity{
 						{Kind: "NodePool"},
@@ -66,8 +66,8 @@ func TestPatchEntityRequiredAdapters(t *testing.T) {
 			name: "multiple entities patches correct one",
 			vals: apiValues{
 				Config: struct {
-					Entities []apiEntity    `yaml:"entities"`
 					Rest     map[string]any `yaml:",inline"`
+					Entities []apiEntity    `yaml:"entities"`
 				}{
 					Entities: []apiEntity{
 						{Kind: "NodePool", RequiredAdapters: []string{"np-adapter"}},
@@ -123,7 +123,11 @@ func TestPatchEntityRequiredAdapters(t *testing.T) {
 				}
 				if e.Kind == "NodePool" {
 					if len(e.RequiredAdapters) != 1 || e.RequiredAdapters[0] != "np-adapter" {
-						t.Errorf("non-target entity %s was modified: RequiredAdapters = %v, want [np-adapter]", e.Kind, e.RequiredAdapters)
+						t.Errorf(
+							"non-target entity %s was modified: RequiredAdapters = %v, want [np-adapter]",
+							e.Kind,
+							e.RequiredAdapters,
+						)
 					}
 				}
 			}
@@ -224,13 +228,17 @@ esac
 	}
 	missing := e
 	missing.Kind = "NotDeployed"
-	if err := h.UpgradeAPIRequiredAdapters(t.Context(), missing, "chart", "namespace", nil); err == nil || !strings.Contains(err.Error(), "not found") {
+	if err := h.UpgradeAPIRequiredAdapters(t.Context(), missing, "chart", "namespace", nil); err == nil ||
+		!strings.Contains(err.Error(), "not found") {
 		t.Fatalf("missing entity silently accepted: %v", err)
 	}
 	assertApplied([]string{"np-base"})
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, e, "chart", "namespace", baseline, 2); !errors.Is(err, context.Canceled) {
+	if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, e, "chart", "namespace", baseline, 2); !errors.Is(
+		err,
+		context.Canceled,
+	) {
 		t.Fatalf("restore lost cancellation: %v", err)
 	}
 }

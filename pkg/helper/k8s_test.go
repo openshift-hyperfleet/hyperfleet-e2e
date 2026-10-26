@@ -15,13 +15,13 @@ import (
 
 func TestVerifyNamespaceActive(t *testing.T) {
 	tests := []struct {
-		name                string
-		namespaceName       string
 		namespace           *corev1.Namespace
 		expectedLabels      map[string]string
 		expectedAnnotations map[string]string
-		wantErr             bool
+		name                string
+		namespaceName       string
 		errContains         string
+		wantErr             bool
 	}{
 		{
 			name:          "active namespace with matching labels and annotations",
@@ -142,13 +142,13 @@ func TestVerifyNamespaceActive(t *testing.T) {
 
 func TestVerifyJobComplete(t *testing.T) {
 	tests := []struct {
-		name                string
-		namespace           string
 		job                 *batchv1.Job
 		expectedLabels      map[string]string
 		expectedAnnotations map[string]string
-		wantErr             bool
+		name                string
+		namespace           string
 		errContains         string
+		wantErr             bool
 	}{
 		{
 			name:      "completed job with matching labels",
@@ -239,9 +239,11 @@ func TestVerifyJobComplete(t *testing.T) {
 
 			// Create job if provided
 			if tt.job != nil {
-				_, err := fakeClient.BatchV1().Jobs(tt.namespace).Create(context.TODO(), tt.job, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Failed to create test job: %v", err)
+				_, createErr := fakeClient.BatchV1().
+					Jobs(tt.namespace).
+					Create(context.TODO(), tt.job, metav1.CreateOptions{})
+				if createErr != nil {
+					t.Fatalf("Failed to create test job: %v", createErr)
 				}
 			}
 
@@ -265,13 +267,13 @@ func TestVerifyJobComplete(t *testing.T) {
 
 func TestVerifyDeploymentAvailable(t *testing.T) {
 	tests := []struct {
-		name                string
-		namespace           string
 		deployment          *appsv1.Deployment
 		expectedLabels      map[string]string
 		expectedAnnotations map[string]string
-		wantErr             bool
+		name                string
+		namespace           string
 		errContains         string
+		wantErr             bool
 	}{
 		{
 			name:      "available deployment with matching labels",
@@ -391,9 +393,11 @@ func TestVerifyDeploymentAvailable(t *testing.T) {
 
 			// Create deployment if provided
 			if tt.deployment != nil {
-				_, err := fakeClient.AppsV1().Deployments(tt.namespace).Create(context.TODO(), tt.deployment, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Failed to create test deployment: %v", err)
+				_, createErr := fakeClient.AppsV1().
+					Deployments(tt.namespace).
+					Create(context.TODO(), tt.deployment, metav1.CreateOptions{})
+				if createErr != nil {
+					t.Fatalf("Failed to create test deployment: %v", createErr)
 				}
 			}
 
@@ -417,12 +421,12 @@ func TestVerifyDeploymentAvailable(t *testing.T) {
 
 func TestVerifyMapContains(t *testing.T) {
 	tests := []struct {
-		name     string
 		actual   map[string]string
 		expected map[string]string
+		name     string
 		mapType  string
-		wantErr  bool
 		errMsg   string
+		wantErr  bool
 	}{
 		{
 			name:     "all expected keys present with matching values",

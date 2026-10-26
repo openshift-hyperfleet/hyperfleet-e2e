@@ -59,7 +59,13 @@ var _ = ginkgo.Describe("[Suite: auth][enforcement] JWT Authentication Enforceme
 				Expect(err).NotTo(HaveOccurred(), "crafting JWT should succeed")
 
 				ginkgo.By("sending GET with invalid-signature token")
-				resp, err := rawRequestWithScheme(ctx, h.Cfg.API.URL, http.MethodGet, token, h.Cfg.MachineAuthorizationScheme())
+				resp, err := rawRequestWithScheme(
+					ctx,
+					h.Cfg.API.URL,
+					http.MethodGet,
+					token,
+					h.Cfg.MachineAuthorizationScheme(),
+				)
 				Expect(err).NotTo(HaveOccurred(), "HTTP request should succeed at transport level")
 				defer func() { _ = resp.Body.Close() }()
 
@@ -80,7 +86,13 @@ var _ = ginkgo.Describe("[Suite: auth][enforcement] JWT Authentication Enforceme
 				Expect(err).NotTo(HaveOccurred(), "crafting expired JWT should succeed")
 
 				ginkgo.By("sending GET with expired token")
-				resp, err := rawRequestWithScheme(ctx, h.Cfg.API.URL, http.MethodGet, token, h.Cfg.MachineAuthorizationScheme())
+				resp, err := rawRequestWithScheme(
+					ctx,
+					h.Cfg.API.URL,
+					http.MethodGet,
+					token,
+					h.Cfg.MachineAuthorizationScheme(),
+				)
 				Expect(err).NotTo(HaveOccurred(), "HTTP request should succeed at transport level")
 				defer func() { _ = resp.Body.Close() }()
 
@@ -97,7 +109,13 @@ var _ = ginkgo.Describe("[Suite: auth][enforcement] JWT Authentication Enforceme
 		ginkgo.It("rejects requests with malformed token with 401",
 			func(ctx context.Context) {
 				ginkgo.By("sending GET with a non-JWT token")
-				resp, err := rawRequestWithScheme(ctx, h.Cfg.API.URL, http.MethodGet, "not-a-jwt", h.Cfg.MachineAuthorizationScheme())
+				resp, err := rawRequestWithScheme(
+					ctx,
+					h.Cfg.API.URL,
+					http.MethodGet,
+					"not-a-jwt",
+					h.Cfg.MachineAuthorizationScheme(),
+				)
 				Expect(err).NotTo(HaveOccurred(), "HTTP request should succeed at transport level")
 				defer func() { _ = resp.Body.Close() }()
 

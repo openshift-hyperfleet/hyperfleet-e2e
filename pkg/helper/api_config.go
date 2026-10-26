@@ -29,23 +29,28 @@ const (
 // apiValues is the subset of Helm values we need to read-modify-write.
 // The inline catch-alls preserve every field we don't model on the round-trip.
 type apiValues struct {
+	Rest   map[string]any `yaml:",inline"`
 	Config struct {
-		Entities []apiEntity    `yaml:"entities"`
 		Rest     map[string]any `yaml:",inline"`
+		Entities []apiEntity    `yaml:"entities"`
 	} `yaml:"config"`
-	Rest map[string]any `yaml:",inline"`
 }
 
 type apiEntity struct {
+	Rest             map[string]any `yaml:",inline"`
 	Kind             string         `yaml:"kind"`
 	RequiredAdapters []string       `yaml:"required_adapters"`
-	Rest             map[string]any `yaml:",inline"`
 }
 
 // UpgradeAPIRequiredAdapters upgrades the API Helm release to update the
 // required adapters for the given entity. It reads the current Helm values,
 // patches the correct entity by kind (not by array index), and applies.
-func (h *Helper) UpgradeAPIRequiredAdapters(ctx context.Context, entity descriptor.EntityDescriptor, apiChartPath, namespace string, adapters []string) error {
+func (h *Helper) UpgradeAPIRequiredAdapters(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	apiChartPath, namespace string,
+	adapters []string,
+) error {
 	slog.Info("upgrading API required adapters",
 		"namespace", namespace,
 		"kind", entity.Kind, "adapters", adapters)
@@ -64,17 +69,20 @@ func (h *Helper) UpgradeAPIRequiredAdapters(ctx context.Context, entity descript
 	}
 	tmpPath := tmpFile.Name()
 	defer func() {
-		if err := os.Remove(tmpPath); err != nil {
-			slog.Error("failed to remove temp values file", "path", tmpPath, "error", err)
+		if removeErr := os.Remove(tmpPath); removeErr != nil {
+			slog.Error("failed to remove temp values file", "path", tmpPath, "error", removeErr)
 		}
 	}()
 
-	if _, err := tmpFile.Write(patchedBytes); err != nil {
-		_ = tmpFile.Close()
-		return fmt.Errorf("failed to write temp values file: %w", err)
+	if _, writeErr := tmpFile.Write(patchedBytes); writeErr != nil {
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			// Preserve the write failure; closing a failed temporary file is best-effort cleanup.
+			slog.Warn("failed to close temp values file after write failure", "error", closeErr)
+		}
+		return fmt.Errorf("failed to write temp values file: %w", writeErr)
 	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temp values file: %w", err)
+	if closeErr := tmpFile.Close(); closeErr != nil {
+		return fmt.Errorf("failed to close temp values file: %w", closeErr)
 	}
 
 	// --values with the full value set (from --all) instead of --reuse-values
@@ -116,7 +124,7 @@ func (h *Helper) waitForAPIReady(ctx context.Context, entity descriptor.EntityDe
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context cancelled waiting for API: %w", ctx.Err())
+			return fmt.Errorf("context canceled waiting for API: %w", ctx.Err())
 		case <-deadline:
 			return fmt.Errorf("API not reachable after %s", apiReadyTimeout)
 		case <-ticker.C:
@@ -148,12 +156,12 @@ func getAndPatchHelmValues(ctx context.Context, namespace, kind string, adapters
 	}
 
 	var vals apiValues
-	if err := yaml.Unmarshal(stdout, &vals); err != nil {
-		return nil, fmt.Errorf("failed to parse helm values: %w", err)
+	if unmarshalErr := yaml.Unmarshal(stdout, &vals); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse helm values: %w", unmarshalErr)
 	}
 
-	if err := patchEntityRequiredAdapters(&vals, kind, adapters); err != nil {
-		return nil, err
+	if patchErr := patchEntityRequiredAdapters(&vals, kind, adapters); patchErr != nil {
+		return nil, patchErr
 	}
 
 	patchedBytes, err := yaml.Marshal(vals)
@@ -178,7 +186,13 @@ func patchEntityRequiredAdapters(vals *apiValues, kind string, adapters []string
 
 // RestoreAPIRequiredAdaptersWithRetry restores the API required adapters with retry logic.
 // This is designed for use in DeferCleanup to ensure API config is restored even on transient failures.
-func (h *Helper) RestoreAPIRequiredAdaptersWithRetry(ctx context.Context, entity descriptor.EntityDescriptor, apiChartPath, namespace string, originalAdapters []string, maxRetries int) error {
+func (h *Helper) RestoreAPIRequiredAdaptersWithRetry(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	apiChartPath, namespace string,
+	originalAdapters []string,
+	maxRetries int,
+) error {
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		err := h.UpgradeAPIRequiredAdapters(ctx, entity, apiChartPath, namespace, originalAdapters)
@@ -196,7 +210,7 @@ func (h *Helper) RestoreAPIRequiredAdaptersWithRetry(ctx context.Context, entity
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				return fmt.Errorf("context cancelled during API config restore retry: %w", ctx.Err())
+				return fmt.Errorf("context canceled during API config restore retry: %w", ctx.Err())
 			case <-timer.C:
 			}
 		}

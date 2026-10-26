@@ -23,8 +23,8 @@ var _ = ginkgo.Describe("[Suite: version][perf] Delete latency",
 			ginkgo.By("creating parent channel")
 			ch, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(ch.Id).NotTo(BeNil(), "channel ID should be set")
-			channelID = *ch.Id
+			Expect(ch.ID).NotTo(BeNil(), "channel ID should be set")
+			channelID = *ch.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {
@@ -37,13 +37,20 @@ var _ = ginkgo.Describe("[Suite: version][perf] Delete latency",
 			// No per-version cleanup: the channel's DeferCleanup above sweeps all its versions.
 			versionIDs := make([]string, helper.DefaultSamples)
 			for i := range versionIDs {
-				version, err := h.Client.CreateVersionFromPayload(ctx, channelID, h.TestDataPath("payloads/versions/version-request.json"))
+				version, err := h.Client.CreateVersionFromPayload(
+					ctx,
+					channelID,
+					h.TestDataPath("payloads/versions/version-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(version.Id).NotTo(BeNil(), "version ID should be set")
-				versionIDs[i] = *version.Id
+				Expect(version.ID).NotTo(BeNil(), "version ID should be set")
+				versionIDs[i] = *version.ID
 			}
 
-			helper.MeasureMedianLatency("DELETE /channels/{parent_id}/versions/{id}", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Version").Thresholds.Delete), len(versionIDs),
+			helper.MeasureMedianLatency(
+				"DELETE /channels/{parent_id}/versions/{id}",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("Version").Thresholds.Delete),
+				len(versionIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteVersion(ctx, channelID, versionIDs[i])
 					Expect(err).NotTo(HaveOccurred())

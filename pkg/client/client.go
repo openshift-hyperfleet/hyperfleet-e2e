@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +15,7 @@ import (
 type HyperFleetClient struct {
 	httpClient *http.Client
 	baseURL    string
+	apiHost    string
 }
 
 // ClientOption configures the HyperFleet client.
@@ -26,14 +28,11 @@ func WithAuthorizationToken(token, scheme string) ClientOption {
 		scheme = "Bearer"
 	}
 	return func(c *HyperFleetClient) {
-		// baseURL is validated in NewHyperFleetClient, so Parse cannot fail here.
-		u, _ := url.Parse(c.baseURL)
-		host := u.Host
 		c.httpClient.Transport = &authTransport{
 			base:   c.httpClient.Transport,
 			token:  token,
 			scheme: scheme,
-			host:   host,
+			host:   c.apiHost,
 		}
 	}
 }
@@ -85,6 +84,7 @@ func NewHyperFleetClient(baseURL string, httpClient *http.Client, opts ...Client
 	c := &HyperFleetClient{
 		httpClient: httpClient,
 		baseURL:    strings.TrimRight(baseURL, "/"),
+		apiHost:    u.Host,
 	}
 
 	for _, opt := range opts {
@@ -96,9 +96,9 @@ func NewHyperFleetClient(baseURL string, httpClient *http.Client, opts ...Client
 
 // HTTPError represents an unexpected HTTP status code from the API.
 type HTTPError struct {
-	StatusCode int
 	Action     string
 	Body       string
+	StatusCode int
 }
 
 func (e *HTTPError) Error() string {
@@ -109,7 +109,7 @@ func (e *HTTPError) Error() string {
 }
 
 func handleHTTPResponse[T any](resp *http.Response, expectedStatus int, action string) (*T, error) {
-	defer func() { _ = resp.Body.Close() }()
+	defer closeResponseBody(resp.Body)
 
 	if resp.StatusCode != expectedStatus {
 		body, err := io.ReadAll(resp.Body)
@@ -136,7 +136,7 @@ func handleHTTPResponse[T any](resp *http.Response, expectedStatus int, action s
 }
 
 func handleHTTPNoBodyResponse(resp *http.Response, expectedStatus int, action string) error {
-	defer func() { _ = resp.Body.Close() }()
+	defer closeResponseBody(resp.Body)
 
 	if resp.StatusCode != expectedStatus {
 		body, err := io.ReadAll(resp.Body)
@@ -155,4 +155,11 @@ func handleHTTPNoBodyResponse(resp *http.Response, expectedStatus int, action st
 	}
 
 	return nil
+}
+
+func closeResponseBody(body io.Closer) {
+	if err := body.Close(); err != nil {
+		// Closing the response is cleanup; preserve the request/decode result for the caller.
+		slog.Warn("failed to close HTTP response body", "error", err)
+	}
 }

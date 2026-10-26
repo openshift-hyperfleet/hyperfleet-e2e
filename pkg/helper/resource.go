@@ -14,7 +14,11 @@ import (
 )
 
 // CreateTestResource creates a temporary resource from a payload and returns its ID.
-func (h *Helper) CreateTestResource(ctx context.Context, entity descriptor.EntityDescriptor, parentID, payloadPath string) (string, error) {
+func (h *Helper) CreateTestResource(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	parentID, payloadPath string,
+) (string, error) {
 	path := entity.CollectionPath(parentID)
 	resource, err := h.Client.CreateResourceFromPayload(ctx, path, payloadPath)
 	if err != nil {
@@ -23,16 +27,20 @@ func (h *Helper) CreateTestResource(ctx context.Context, entity descriptor.Entit
 	if resource == nil {
 		return "", fmt.Errorf("CreateResourceFromPayload returned nil")
 	}
-	if resource.Id == nil {
+	if resource.ID == nil {
 		return "", fmt.Errorf("created %s has no ID", entity.Kind)
 	}
-	return *resource.Id, nil
+	return *resource.ID, nil
 }
 
 // CleanupTestResource deletes through the API, which owns adapter finalization
 // and downstream cleanup. The descriptor preserves each suite's teardown policy;
 // no-poll cleanup does not imply that the API cannot hard-delete the resource.
-func (h *Helper) CleanupTestResource(ctx context.Context, entity descriptor.EntityDescriptor, parentID, resourceID string) error {
+func (h *Helper) CleanupTestResource(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	parentID, resourceID string,
+) error {
 	path := entity.ResourcePath(parentID, resourceID)
 
 	childErr, err := h.cleanupChildren(ctx, entity, resourceID)
@@ -62,7 +70,11 @@ func (h *Helper) CleanupTestResource(ctx context.Context, entity descriptor.Enti
 // cleanupChildren keeps the existing explicit child-first teardown: list once,
 // skip deleted/ID-less children, attempt every remaining delete, then let the
 // caller delete the parent. A list failure aborts; a child-delete failure does not.
-func (h *Helper) cleanupChildren(ctx context.Context, entity descriptor.EntityDescriptor, resourceID string) (deleteErr, listErr error) {
+func (h *Helper) cleanupChildren(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	resourceID string,
+) (deleteErr, listErr error) {
 	for _, kind := range entity.Cleanup.ChildKinds {
 		child, err := h.Entities.Lookup(kind)
 		if err != nil {
@@ -74,15 +86,23 @@ func (h *Helper) cleanupChildren(ctx context.Context, entity descriptor.EntityDe
 			return deleteErr, fmt.Errorf("list %s for %s %s: %w", kind, entity.Kind, resourceID, err)
 		}
 		for _, resource := range children.Items {
-			if resource.DeletedTime != nil || resource.Id == nil {
+			if resource.DeletedTime != nil || resource.ID == nil {
 				continue
 			}
-			childPath := child.ResourcePath(resourceID, *resource.Id)
+			childPath := child.ResourcePath(resourceID, *resource.ID)
 			_, err := h.Client.DeleteResource(ctx, childPath)
 			if err != nil && !isHTTPStatus(err, http.StatusNotFound) {
-				slog.Error("failed to delete child during cleanup", "kind", kind, "resource_id", *resource.Id, "error", err)
+				slog.Error(
+					"failed to delete child during cleanup",
+					"kind",
+					kind,
+					"resource_id",
+					*resource.ID,
+					"error",
+					err,
+				)
 				if deleteErr == nil {
-					deleteErr = fmt.Errorf("delete %s %s: %w", kind, *resource.Id, err)
+					deleteErr = fmt.Errorf("delete %s %s: %w", kind, *resource.ID, err)
 				}
 			}
 		}
@@ -90,7 +110,11 @@ func (h *Helper) cleanupChildren(ctx context.Context, entity descriptor.EntityDe
 	return deleteErr, nil
 }
 
-func (h *Helper) pollHardDeletion(ctx context.Context, entity descriptor.EntityDescriptor, parentID, resourceID string) error {
+func (h *Helper) pollHardDeletion(
+	ctx context.Context,
+	entity descriptor.EntityDescriptor,
+	parentID, resourceID string,
+) error {
 	// Preserve the existing loop: the deadline is checked between requests, and
 	// each request uses the caller's context. The interval is an ordinary sleep.
 	poll := h.PollHTTPStatus(ctx, entity, parentID, resourceID)

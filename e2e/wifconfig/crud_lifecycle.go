@@ -22,11 +22,14 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 			h = helper.New()
 
 			var err error
-			wifConfig, err = h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
+			wifConfig, err = h.Client.CreateWifConfigFromPayload(
+				ctx,
+				h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create wifconfig")
-			Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be generated")
+			Expect(wifConfig.ID).NotTo(BeNil(), "wifconfig ID should be generated")
 			Expect(wifConfig.Name).NotTo(BeEmpty(), "wifconfig name should be present")
-			wifConfigID = *wifConfig.Id
+			wifConfigID = *wifConfig.ID
 			ginkgo.GinkgoWriter.Printf("Created wifconfig ID: %s, Name: %s\n", wifConfigID, wifConfig.Name)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -47,7 +50,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 			fetched, err := h.Client.GetWifConfig(ctx, wifConfigID)
 			Expect(err).NotTo(HaveOccurred(), "failed to get wifconfig")
 
-			Expect(*fetched.Id).To(Equal(wifConfigID))
+			Expect(*fetched.ID).To(Equal(wifConfigID))
 			Expect(fetched.Name).To(Equal(wifConfig.Name))
 			Expect(fetched.Kind).To(Equal("WifConfig"))
 			Expect(fetched.Generation).To(Equal(int32(1)))
@@ -62,7 +65,7 @@ var _ = ginkgo.Describe("[Suite: wifconfig][crud] WifConfig CRUD Lifecycle",
 			ginkgo.By("verifying created wifconfig appears in list")
 			found := false
 			for _, wc := range list.Items {
-				if wc.Id != nil && *wc.Id == wifConfigID {
+				if wc.ID != nil && *wc.ID == wifConfigID {
 					found = true
 					break
 				}

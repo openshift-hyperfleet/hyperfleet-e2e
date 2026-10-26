@@ -1,10 +1,52 @@
 package client
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+type failingCloseBody struct {
+	io.Reader
+	closed bool
+}
+
+func (b *failingCloseBody) Close() error {
+	b.closed = true
+	return errors.New("response close failed")
+}
+
+func TestResponseCleanupPreservesResult(t *testing.T) {
+	t.Parallel()
+	for _, status := range []int{http.StatusOK, http.StatusBadRequest} {
+		body := &failingCloseBody{Reader: strings.NewReader(`{"name":"test"}`)}
+		resource, err := handleHTTPResponse[Resource](
+			&http.Response{StatusCode: status, Body: body}, http.StatusOK, "get resource",
+		)
+		if !body.closed {
+			t.Fatal("response body was not closed")
+		}
+		if status == http.StatusOK {
+			if err != nil || resource == nil || resource.Name != "test" {
+				t.Fatalf("cleanup changed successful response: resource=%+v err=%v", resource, err)
+			}
+		} else {
+			var httpErr *HTTPError
+			if !errors.As(err, &httpErr) || httpErr.StatusCode != status {
+				t.Fatalf("cleanup replaced the HTTP error: %v", err)
+			}
+		}
+	}
+	body := &failingCloseBody{Reader: strings.NewReader("")}
+	if err := handleHTTPNoBodyResponse(
+		&http.Response{StatusCode: http.StatusNoContent, Body: body}, http.StatusNoContent, "delete resource",
+	); err != nil || !body.closed {
+		t.Fatalf("no-body cleanup changed the result: closed=%v err=%v", body.closed, err)
+	}
+}
 
 func TestWithBearerToken(t *testing.T) {
 	t.Parallel()

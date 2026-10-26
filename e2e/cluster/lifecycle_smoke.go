@@ -20,20 +20,31 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Full Lifecycle Smoke
 				h := helper.New()
 
 				ginkgo.By("creating a cluster")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "create should succeed")
 				Expect(cluster).NotTo(BeNil(), "create should return a cluster object")
-				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be assigned")
-				clusterID := *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be assigned")
+				clusterID := *cluster.ID
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
-					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: cleanup failed for cluster %s: %v\n", clusterID, err)
+					if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); cleanupErr != nil {
+						ginkgo.GinkgoWriter.Printf(
+							"Warning: cleanup failed for cluster %s: %v\n",
+							clusterID,
+							cleanupErr,
+						)
 					}
 				})
 
 				ginkgo.By("waiting for Reconciled=True")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("confirming reconciled state via GET")
@@ -51,11 +62,19 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Full Lifecycle Smoke
 				Expect(deletedCluster.DeletedTime).NotTo(BeNil())
 
 				ginkgo.By("waiting for hard-delete (404)")
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.By("confirming K8s namespace is cleaned up")
-				Eventually(h.PollNamespacesByPrefix(ctx, clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollNamespacesByPrefix(ctx, clusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
 					Should(BeEmpty())
 			})
 	},

@@ -48,13 +48,18 @@ func TestEntityCatalogOverlaysConfigOnRowDefaults(t *testing.T) {
 	if !slices.Equal(np.RequiredAdapters, []string{"np-configmap"}) {
 		t.Errorf("NodePool adapters = %q, want the row default", np.RequiredAdapters)
 	}
-	if np.Timeouts != (descriptor.EntityTimeouts{Reconciled: defaultEntityTimeouts.Reconciled, Deleted: 61 * time.Second}) {
+	if np.Timeouts != (descriptor.EntityTimeouts{
+		Reconciled: defaultEntityTimeouts.Reconciled, Deleted: 61 * time.Second,
+	}) {
 		t.Errorf("NodePool timeouts = %+v, want deleted overridden and reconciled at the default", np.Timeouts)
 	}
-	if p := catalog.MustGet("Parent"); !slices.Equal(p.RequiredAdapters, []string{"p-success"}) || p.Timeouts != defaultEntityTimeouts {
+	if p := catalog.MustGet("Parent"); !slices.Equal(p.RequiredAdapters, []string{"p-success"}) ||
+		p.Timeouts != defaultEntityTimeouts {
 		t.Errorf("Parent = %q %+v, want the adapters override and default timeouts", p.RequiredAdapters, p.Timeouts)
 	}
-	if cc := catalog.MustGet("CascadeChild"); cc.Timeouts != (descriptor.EntityTimeouts{Reconciled: 53 * time.Second, Deleted: 47 * time.Second}) {
+	if cc := catalog.MustGet("CascadeChild"); cc.Timeouts != (descriptor.EntityTimeouts{
+		Reconciled: 53 * time.Second, Deleted: 47 * time.Second,
+	}) {
 		t.Errorf("CascadeChild timeouts = %+v, want both overridden", cc.Timeouts)
 	}
 
@@ -100,12 +105,14 @@ func TestEntityCatalogRowDefaults(t *testing.T) {
 	}
 	for _, kind := range []string{"Channel", "WifConfig"} {
 		e := catalog.MustGet(kind)
-		if e.Thresholds.Create != 60*time.Millisecond || e.Thresholds.Update != 60*time.Millisecond || e.Thresholds.Delete != 60*time.Millisecond {
+		if e.Thresholds.Create != 60*time.Millisecond || e.Thresholds.Update != 60*time.Millisecond ||
+			e.Thresholds.Delete != 60*time.Millisecond {
 			t.Errorf("%s write thresholds changed", kind)
 		}
 	}
 	v := catalog.MustGet("Version")
-	if v.Thresholds.Create != 75*time.Millisecond || v.Thresholds.Update != 75*time.Millisecond || v.Thresholds.Delete != 75*time.Millisecond {
+	if v.Thresholds.Create != 75*time.Millisecond || v.Thresholds.Update != 75*time.Millisecond ||
+		v.Thresholds.Delete != 75*time.Millisecond {
 		t.Error("nested write thresholds changed")
 	}
 
@@ -116,7 +123,8 @@ func TestEntityCatalogRowDefaults(t *testing.T) {
 	}
 	for _, kind := range []string{"RestrictChild", "Referencer", "Target"} {
 		e := catalog.MustGet(kind)
-		if len(e.RequiredAdapters) != 0 || e.Timeouts != (descriptor.EntityTimeouts{}) || e.Thresholds != (descriptor.EntityThresholds{}) {
+		if len(e.RequiredAdapters) != 0 || e.Timeouts != (descriptor.EntityTimeouts{}) ||
+			e.Thresholds != (descriptor.EntityThresholds{}) {
 			t.Errorf("fixture %s received invented runtime settings", kind)
 		}
 	}

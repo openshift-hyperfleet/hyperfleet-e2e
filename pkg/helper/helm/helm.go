@@ -15,11 +15,11 @@ import (
 
 // Client wraps Helm SDK functionality
 type Client struct {
-	settings     *cli.EnvSettings
-	namespace    string
-	actionConfig *action.Configuration
-	configOnce   sync.Once
 	configErr    error
+	settings     *cli.EnvSettings
+	actionConfig *action.Configuration
+	namespace    string
+	configOnce   sync.Once
 }
 
 // NewClient creates a new Helm client using default environment settings
@@ -40,9 +40,15 @@ func (c *Client) initActionConfig() (*action.Configuration, error) {
 		helmDriver := ""
 
 		// Initialize with REST client getter, namespace, and driver
-		if err := actionConfig.Init(c.settings.RESTClientGetter(), c.namespace, helmDriver, func(format string, v ...interface{}) {
-			slog.Info(fmt.Sprintf(format, v...))
-		}); err != nil {
+		err := actionConfig.Init(
+			c.settings.RESTClientGetter(),
+			c.namespace,
+			helmDriver,
+			func(format string, v ...interface{}) {
+				slog.Info(fmt.Sprintf(format, v...))
+			},
+		)
+		if err != nil {
 			c.configErr = fmt.Errorf("failed to init Helm action config: %w", err)
 			return
 		}

@@ -1,4 +1,4 @@
-package util
+package pointer
 
 // ToPtr returns a pointer copy of value.
 func ToPtr[T any](x T) *T {

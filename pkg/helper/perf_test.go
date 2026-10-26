@@ -13,8 +13,8 @@ import (
 func TestAssertMedianBelowThreshold(t *testing.T) {
 	tests := []struct {
 		name        string
-		threshold   time.Duration
 		durations   []time.Duration
+		threshold   time.Duration
 		wantFailure bool
 	}{
 		{
@@ -47,9 +47,14 @@ func TestAssertMedianBelowThreshold(t *testing.T) {
 		{
 			// 10/20/40/50ms averages to 30ms; lower-middle (20ms) would
 			// wrongly pass this threshold.
-			name:        "even-sample-count-lower-middle",
-			threshold:   25 * time.Millisecond,
-			durations:   []time.Duration{10 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond, 50 * time.Millisecond},
+			name:      "even-sample-count-lower-middle",
+			threshold: 25 * time.Millisecond,
+			durations: []time.Duration{
+				10 * time.Millisecond,
+				20 * time.Millisecond,
+				40 * time.Millisecond,
+				50 * time.Millisecond,
+			},
 			wantFailure: true,
 		},
 		{
@@ -57,7 +62,12 @@ func TestAssertMedianBelowThreshold(t *testing.T) {
 			// wrongly fail this threshold.
 			name:      "even-sample-count-upper-middle",
 			threshold: 35 * time.Millisecond,
-			durations: []time.Duration{10 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond, 50 * time.Millisecond},
+			durations: []time.Duration{
+				10 * time.Millisecond,
+				20 * time.Millisecond,
+				40 * time.Millisecond,
+				50 * time.Millisecond,
+			},
 		},
 	}
 

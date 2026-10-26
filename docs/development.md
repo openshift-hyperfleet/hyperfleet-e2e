@@ -30,7 +30,7 @@ Start by reading existing tests to understand the patterns:
 
 Test payloads are stored in `testdata/payloads/`:
 
-```
+```text
 testdata/payloads/
 ├── clusters/
 │   └── cluster-request.json        # resource cluster payload
@@ -98,7 +98,7 @@ var _ = ginkgo.Describe(testName,
             ginkgo.By("submitting cluster creation request")
             cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
             Expect(err).NotTo(HaveOccurred())
-            clusterID = *cluster.Id
+            clusterID = *cluster.ID
             ginkgo.DeferCleanup(func(ctx context.Context) {
                 if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
                     ginkgo.GinkgoWriter.Printf("Warning: cleanup failed: %v\n", err)
@@ -216,7 +216,7 @@ ginkgo.DeferCleanup(func(ctx context.Context) {
 ```go
 // Basic assertions
 Expect(err).NotTo(HaveOccurred())
-Expect(cluster.Id).NotTo(BeNil())
+Expect(cluster.ID).NotTo(BeNil())
 Expect(cluster.Generation).To(Equal(int32(1)))
 
 // Async: use pollers + custom matchers (preferred)

@@ -23,23 +23,30 @@ var _ = ginkgo.Describe("[Suite: version][perf] API list latency",
 			ginkgo.By("creating parent channel")
 			ch, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(ch.Id).NotTo(BeNil(), "channel ID should be set")
-			channelID = *ch.Id
+			Expect(ch.ID).NotTo(BeNil(), "channel ID should be set")
+			channelID = *ch.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup channel %s: %v\n", channelID, err)
+				if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); cleanupErr != nil {
+					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup channel %s: %v\n", channelID, cleanupErr)
 				}
 			})
 
 			ginkgo.By("creating version under channel")
-			version, err := h.Client.CreateVersionFromPayload(ctx, channelID, h.TestDataPath("payloads/versions/version-request.json"))
+			version, err := h.Client.CreateVersionFromPayload(
+				ctx,
+				channelID,
+				h.TestDataPath("payloads/versions/version-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(version.Id).NotTo(BeNil(), "version ID should be set")
+			Expect(version.ID).NotTo(BeNil(), "version ID should be set")
 		})
 
 		ginkgo.It("should list versions within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("GET /channels/{parent_id}/versions", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Version").Thresholds.List), helper.DefaultSamples,
+			helper.MeasureMedianLatency(
+				"GET /channels/{parent_id}/versions",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("Version").Thresholds.List),
+				helper.DefaultSamples,
 				func(int) {
 					_, err := h.Client.ListVersions(ctx, channelID, "")
 					Expect(err).NotTo(HaveOccurred())

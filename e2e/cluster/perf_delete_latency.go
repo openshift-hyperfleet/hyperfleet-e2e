@@ -22,10 +22,13 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Delete-to-hard-delete latency",
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
 
-			cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			cluster, err := h.Client.CreateClusterFromPayload(
+				ctx,
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be set")
-			clusterID = *cluster.Id
+			Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be set")
+			clusterID = *cluster.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
@@ -34,7 +37,11 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Delete-to-hard-delete latency",
 			})
 
 			ginkgo.By("waiting for cluster to reach Reconciled before delete")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
@@ -45,7 +52,11 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] Delete-to-hard-delete latency",
 			_, err := h.Client.DeleteCluster(ctx, clusterID)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
+			Eventually(
+				h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Deleted,
+				h.Cfg.Polling.Interval,
+			).
 				Should(Equal(http.StatusNotFound))
 
 			elapsed := time.Since(start)

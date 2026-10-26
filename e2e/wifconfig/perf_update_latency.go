@@ -22,10 +22,13 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Update latency",
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
 
-			wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
+			wifConfig, err := h.Client.CreateWifConfigFromPayload(
+				ctx,
+				h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be set")
-			wifConfigID = *wifConfig.Id
+			Expect(wifConfig.ID).NotTo(BeNil(), "wifconfig ID should be set")
+			wifConfigID = *wifConfig.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("WifConfig"), "", wifConfigID); err != nil {
@@ -35,7 +38,10 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Update latency",
 		})
 
 		ginkgo.It("should update a wifconfig within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("PATCH /wifconfigs/{id}", h.Cfg.APILatencyThreshold(h.Entities.MustGet("WifConfig").Thresholds.Update), helper.DefaultSamples,
+			helper.MeasureMedianLatency(
+				"PATCH /wifconfigs/{id}",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("WifConfig").Thresholds.Update),
+				helper.DefaultSamples,
 				func(i int) {
 					_, err := h.Client.PatchWifConfig(ctx, wifConfigID, client.ResourcePatchRequest{
 						Spec: map[string]any{

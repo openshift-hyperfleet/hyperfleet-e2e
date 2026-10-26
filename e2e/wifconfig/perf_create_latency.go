@@ -21,14 +21,20 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Create latency",
 		})
 
 		ginkgo.It("should create a wifconfig within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /wifconfigs", h.Cfg.APILatencyThreshold(h.Entities.MustGet("WifConfig").Thresholds.Create), helper.DefaultSamples,
+			helper.MeasureMedianLatency(
+				"POST /wifconfigs",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("WifConfig").Thresholds.Create),
+				helper.DefaultSamples,
 				func(int) {
-					wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
-					if wifConfig != nil && wifConfig.Id != nil {
-						h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.Id)
+					wifConfig, err := h.Client.CreateWifConfigFromPayload(
+						ctx,
+						h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"),
+					)
+					if wifConfig != nil && wifConfig.ID != nil {
+						h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.ID)
 					}
 					Expect(err).NotTo(HaveOccurred())
-					Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be set")
+					Expect(wifConfig.ID).NotTo(BeNil(), "wifconfig ID should be set")
 				},
 			)
 		})

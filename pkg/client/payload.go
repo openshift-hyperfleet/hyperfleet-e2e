@@ -17,10 +17,10 @@ import (
 // This is the authoritative source for all template variables.
 // Add new template variables here as needed.
 type templateVars struct {
-	Timestamp   int64  // Unix timestamp in seconds (e.g., 1768990421)
-	TimestampMs int64  // Unix timestamp in milliseconds (e.g., 1768990421000)
 	Random      string // 8-character random hex string (e.g., 728d5ee0)
 	UUID        string // Full UUID v4 (e.g., dda65639-774b-4ad1-bd98-4d43bd4d9425)
+	Timestamp   int64  // Unix timestamp in seconds (e.g., 1768990421)
+	TimestampMs int64  // Unix timestamp in milliseconds (e.g., 1768990421000)
 }
 
 // newTemplateVars creates a new set of template variables with current values
@@ -29,7 +29,10 @@ func newTemplateVars() *templateVars {
 
 	// Generate 8-character random hex string
 	randomBytes := make([]byte, 4) // 4 bytes = 8 hex chars
-	_, _ = rand.Read(randomBytes)  // crypto/rand.Read always returns nil error on success
+	if _, err := rand.Read(randomBytes); err != nil {
+		// crypto/rand.Read guarantees a nil error; an entropy failure is unrecoverable.
+		panic(fmt.Sprintf("failed to generate random template value: %v", err))
+	}
 
 	return &templateVars{
 		Timestamp:   now.Unix(),

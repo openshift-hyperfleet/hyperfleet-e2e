@@ -22,11 +22,14 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 			h = helper.New()
 
 			var err error
-			channel, err = h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
+			channel, err = h.Client.CreateChannelFromPayload(
+				ctx,
+				h.TestDataPath("payloads/channels/channel-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create channel")
-			Expect(channel.Id).NotTo(BeNil(), "channel ID should be generated")
+			Expect(channel.ID).NotTo(BeNil(), "channel ID should be generated")
 			Expect(channel.Name).NotTo(BeEmpty(), "channel name should be present")
-			channelID = *channel.Id
+			channelID = *channel.ID
 			ginkgo.GinkgoWriter.Printf("Created channel ID: %s, Name: %s\n", channelID, channel.Name)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -47,7 +50,7 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 			fetched, err := h.Client.GetChannel(ctx, channelID)
 			Expect(err).NotTo(HaveOccurred(), "failed to get channel")
 
-			Expect(*fetched.Id).To(Equal(channelID))
+			Expect(*fetched.ID).To(Equal(channelID))
 			Expect(fetched.Name).To(Equal(channel.Name))
 			Expect(fetched.Kind).To(Equal("Channel"))
 			Expect(fetched.Generation).To(Equal(int32(1)))
@@ -62,7 +65,7 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 			ginkgo.By("verifying created channel appears in list")
 			found := false
 			for _, ch := range list.Items {
-				if ch.Id != nil && *ch.Id == channelID {
+				if ch.ID != nil && *ch.ID == channelID {
 					found = true
 					break
 				}
@@ -101,7 +104,7 @@ var _ = ginkgo.Describe("[Suite: channel][crud] Channel CRUD Lifecycle",
 			fetched, err := h.Client.ListChannels(ctx, "labels.crud='"+channelID+"'")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fetched.Items).To(HaveLen(1), "should have 1 channel")
-			Expect(fetched.Items[0].Id).To(HaveValue(Equal(channelID)))
+			Expect(fetched.Items[0].ID).To(HaveValue(Equal(channelID)))
 		})
 
 		ginkgo.It("should delete channel", func(ctx context.Context) {

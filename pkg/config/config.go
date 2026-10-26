@@ -167,6 +167,9 @@ var Desire = struct {
 	Adapter: "desire.adapter",
 }
 
+// BrokerTypeGooglePubSub identifies the Google Pub/Sub broker backend.
+const BrokerTypeGooglePubSub = "googlepubsub"
+
 // AdapterDeploymentConfig contains configuration for deploying adapters via Helm in tests.
 type AdapterDeploymentConfig struct {
 	ChartRepo     string `yaml:"chartRepo" mapstructure:"chartRepo"`
@@ -189,7 +192,8 @@ type APIDeploymentConfig struct {
 // When enabled (ServiceAccountName is set), a JWT is acquired via the K8s TokenRequest API
 // at suite startup and used for API authentication.
 type TokenRequestConfig struct {
-	ServiceAccountName string `yaml:"serviceAccountName" mapstructure:"serviceAccountName"` // Fixed to the E2E runner identity for authenticated modes.
+	// Fixed to the E2E runner identity for authenticated modes.
+	ServiceAccountName string `yaml:"serviceAccountName" mapstructure:"serviceAccountName"`
 	Namespace          string `yaml:"namespace" mapstructure:"namespace"`
 	Audience           string `yaml:"audience" mapstructure:"audience"`
 	ExpirationSeconds  int64  `yaml:"expirationSeconds" mapstructure:"expirationSeconds"`
@@ -204,9 +208,11 @@ func (t TokenRequestConfig) IsEnabled() bool {
 // token is acquired via TokenRequest at runtime and sent with the mode-appropriate scheme.
 // ExpectedIdentity is used by test assertions to verify audit fields (created_by, deleted_by).
 type IdentityConfig struct {
-	token            string             // JWT machine token (acquired via TokenRequest, not user-configurable)
-	ExpectedIdentity string             `yaml:"expectedIdentity" mapstructure:"expectedIdentity"` // Expected audit identity for assertions
-	TokenRequest     TokenRequestConfig `yaml:"tokenRequest" mapstructure:"tokenRequest"`         // K8s TokenRequest JWT acquisition
+	token string // JWT machine token (acquired via TokenRequest, not user-configurable)
+	// Expected audit identity for assertions.
+	ExpectedIdentity string `yaml:"expectedIdentity" mapstructure:"expectedIdentity"`
+	// K8s TokenRequest JWT acquisition.
+	TokenRequest TokenRequestConfig `yaml:"tokenRequest" mapstructure:"tokenRequest"`
 }
 
 // Token returns the JWT bearer token.
@@ -233,25 +239,24 @@ type DesireConfig struct {
 
 // Config represents the e2e test configuration
 type Config struct {
-	Namespace         string                  `yaml:"namespace" mapstructure:"namespace"`
-	GCPProjectID      string                  `yaml:"gcpProjectId" mapstructure:"gcpProjectId"`
-	OutputDir         string                  `yaml:"outputDir" mapstructure:"outputDir"`
-	TestDataDir       string                  `yaml:"testDataDir" mapstructure:"testDataDir"`
-	RunID             string                  `yaml:"runId" mapstructure:"runId"`
-	AuthMode          string                  `yaml:"auth_mode" mapstructure:"auth_mode"`
-	API               APIConfig               `yaml:"api" mapstructure:"api"`
-	Timeouts          TimeoutsConfig          `yaml:"timeouts" mapstructure:"timeouts"`
-	Polling           PollingConfig           `yaml:"polling" mapstructure:"polling"`
-	Log               LogConfig               `yaml:"log" mapstructure:"log"`
-	AdapterDeployment AdapterDeploymentConfig `yaml:"adapterDeployment" mapstructure:"adapterDeployment"`
-	APIDeployment     APIDeploymentConfig     `yaml:"apiDeployment" mapstructure:"apiDeployment"`
-	BrokerType        string                  `yaml:"brokerType" mapstructure:"brokerType"`
-	Identity          IdentityConfig          `yaml:"identity" mapstructure:"identity"`
-	Desire            DesireConfig            `yaml:"desire" mapstructure:"desire"`
-
 	// Entities is the descriptor catalog with the adapters.<kind> and timeouts.<kind>
 	// config overlaid, built and validated once by Load.
-	Entities *descriptor.Catalog `yaml:"-" mapstructure:"-"`
+	Entities          *descriptor.Catalog     `yaml:"-" mapstructure:"-"`
+	AdapterDeployment AdapterDeploymentConfig `yaml:"adapterDeployment" mapstructure:"adapterDeployment"`
+	Log               LogConfig               `yaml:"log" mapstructure:"log"`
+	APIDeployment     APIDeploymentConfig     `yaml:"apiDeployment" mapstructure:"apiDeployment"`
+	BrokerType        string                  `yaml:"brokerType" mapstructure:"brokerType"`
+	AuthMode          string                  `yaml:"auth_mode" mapstructure:"auth_mode"`
+	API               APIConfig               `yaml:"api" mapstructure:"api"`
+	RunID             string                  `yaml:"runId" mapstructure:"runId"`
+	TestDataDir       string                  `yaml:"testDataDir" mapstructure:"testDataDir"`
+	OutputDir         string                  `yaml:"outputDir" mapstructure:"outputDir"`
+	Namespace         string                  `yaml:"namespace" mapstructure:"namespace"`
+	Desire            DesireConfig            `yaml:"desire" mapstructure:"desire"`
+	GCPProjectID      string                  `yaml:"gcpProjectId" mapstructure:"gcpProjectId"`
+	Identity          IdentityConfig          `yaml:"identity" mapstructure:"identity"`
+	Timeouts          TimeoutsConfig          `yaml:"timeouts" mapstructure:"timeouts"`
+	Polling           PollingConfig           `yaml:"polling" mapstructure:"polling"`
 }
 
 // MachineAuthorizationScheme returns the Authorization scheme for Kubernetes ServiceAccount tokens.
@@ -366,6 +371,9 @@ func rejectBareDurations(c *mapstructure.DecoderConfig) {
 				if !reflect.ValueOf(data).IsZero() {
 					return nil, fmt.Errorf("duration %v has no unit; write it with one, such as %vs", data, data)
 				}
+			default:
+				// Leave other types to the remaining decode hooks.
+				return data, nil
 			}
 			return data, nil
 		},
@@ -377,17 +385,24 @@ func rejectBareDurations(c *mapstructure.DecoderConfig) {
 // AutomaticEnv covers viper.Get, and ExperimentalBindStruct makes viper.Unmarshal
 // take its keys from the Config fields, so an env var reaches a field that the
 // config file does not set. viper.Reset clears the option, so call this after it.
-func BindEnvVars() {
+func BindEnvVars() error {
 	viper.SetEnvPrefix(EnvPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 	viper.SetOptions(viper.ExperimentalBindStruct())
 	// Aliases for adapters.cluster and adapters.nodepool, removed with the per-kind
 	// suites in HYPERFLEET-1734. HYPERFLEET_ADAPTERS_<KIND> still wins.
-	_ = viper.BindEnv("adapters.cluster", "API_ADAPTERS_CLUSTER")
-	_ = viper.BindEnv("adapters.nodepool", "API_ADAPTERS_NODEPOOL")
-	// Unprefixed alias for auth_mode. HYPERFLEET_AUTH_MODE still wins.
-	_ = viper.BindEnv(Authentication.Mode, "AUTH_MODE")
+	// Include the unprefixed auth_mode alias. HYPERFLEET_AUTH_MODE still wins.
+	for _, binding := range [][]string{
+		{"adapters.cluster", "API_ADAPTERS_CLUSTER"},
+		{"adapters.nodepool", "API_ADAPTERS_NODEPOOL"},
+		{Authentication.Mode, "AUTH_MODE"},
+	} {
+		if err := viper.BindEnv(binding...); err != nil {
+			return fmt.Errorf("failed to bind environment for %s: %w", binding[0], err)
+		}
+	}
+	return nil
 }
 
 // applyDefaults applies default values for unset fields.
@@ -548,7 +563,10 @@ func (c *Config) Validate() error {
 	switch c.AuthMode {
 	case AuthModeNone, AuthModeAPI, AuthModeEdge, AuthModeEdgeAPI:
 	default:
-		return fmt.Errorf("configuration validation failed: auth_mode must be one of: NONE, API, EDGE, or EDGE+API. Got: %s", c.AuthMode)
+		return fmt.Errorf(
+			"configuration validation failed: auth_mode must be one of: NONE, API, EDGE, or EDGE+API. Got: %s",
+			c.AuthMode,
+		)
 	}
 
 	// Validate API URL requirement (not needed for dry-run listing)
@@ -563,7 +581,9 @@ func (c *Config) Validate() error {
 
 	if !dryRun {
 		if c.RunID == "" {
-			return fmt.Errorf("RUN_ID must be set for resource cleanup tracking. Set runId in test config or set RUN_ID env variable")
+			return fmt.Errorf(
+				"RUN_ID must be set for resource cleanup tracking. Set runId in test config or set RUN_ID env variable",
+			)
 		}
 
 		if len(c.RunID) > 63 || !LabelValueRegex.MatchString(c.RunID) {
@@ -572,15 +592,24 @@ func (c *Config) Validate() error {
 	}
 	// Validate broker type
 	if c.BrokerType != "googlepubsub" && c.BrokerType != "rabbitmq" {
-		return fmt.Errorf("configuration validation failed: brokerType must be one of: googlepubsub, rabbitmq. Got: %s", c.BrokerType)
+		return fmt.Errorf(
+			"configuration validation failed: brokerType must be one of: googlepubsub, rabbitmq. Got: %s",
+			c.BrokerType,
+		)
 	}
 
 	// Validate that the shared timeouts and polling interval are positive
 	if c.Timeouts.Adapter.Processing <= 0 {
-		return fmt.Errorf("configuration validation failed: timeouts.adapter.processing must be a positive duration, got %v", c.Timeouts.Adapter.Processing)
+		return fmt.Errorf(
+			"configuration validation failed: timeouts.adapter.processing must be a positive duration, got %v",
+			c.Timeouts.Adapter.Processing,
+		)
 	}
 	if c.Polling.Interval <= 0 {
-		return fmt.Errorf("configuration validation failed: polling.interval must be a positive duration, got %v", c.Polling.Interval)
+		return fmt.Errorf(
+			"configuration validation failed: polling.interval must be a positive duration, got %v",
+			c.Polling.Interval,
+		)
 	}
 
 	// Load validated the per-kind adapters and timeouts when it built Entities.
@@ -591,14 +620,23 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("configuration validation failed: NAMESPACE is required when AUTH_MODE=%s", c.AuthMode)
 		}
 		if c.Identity.TokenRequest.Namespace == "" && !dryRun {
-			return fmt.Errorf("configuration validation failed: identity.tokenRequest.namespace is required when tokenRequest is enabled")
+			return fmt.Errorf(
+				"configuration validation failed: identity.tokenRequest.namespace is required when tokenRequest is enabled",
+			)
 		}
 		if !dryRun && c.AuthMode != AuthModeNone {
 			if c.Identity.TokenRequest.Namespace != c.Namespace {
-				return fmt.Errorf("configuration validation failed: identity.tokenRequest.namespace must match namespace for AUTH_MODE=%s", c.AuthMode)
+				return fmt.Errorf(
+					"configuration validation failed: identity.tokenRequest.namespace must match namespace for AUTH_MODE=%s",
+					c.AuthMode,
+				)
 			}
 			if c.Identity.TokenRequest.ServiceAccountName != DefaultE2ERunnerServiceAccountName {
-				return fmt.Errorf("configuration validation failed: identity.tokenRequest.serviceAccountName is fixed to %q for E2E machine authentication", DefaultE2ERunnerServiceAccountName)
+				return fmt.Errorf(
+					"configuration validation failed: identity.tokenRequest.serviceAccountName is fixed to %q "+
+						"for E2E machine authentication",
+					DefaultE2ERunnerServiceAccountName,
+				)
 			}
 		}
 
@@ -612,13 +650,23 @@ func (c *Config) Validate() error {
 			}
 			tokenLifetime := time.Duration(c.Identity.TokenRequest.ExpirationSeconds) * time.Second
 			if tokenLifetime > 0 && tokenLifetime < suiteTimeout {
-				return fmt.Errorf("configuration validation failed: identity.tokenRequest.expirationSeconds (%ds = %s) is shorter than the suite timeout (%s) - the JWT will expire mid-run causing 401 failures. Increase expirationSeconds or reduce SUITE_TIMEOUT",
-					c.Identity.TokenRequest.ExpirationSeconds, tokenLifetime, suiteTimeout)
+				return fmt.Errorf(
+					"configuration validation failed: identity.tokenRequest.expirationSeconds (%ds = %s) "+
+						"is shorter than the suite timeout (%s) - the JWT will expire mid-run causing 401 failures. "+
+						"Increase expirationSeconds or reduce SUITE_TIMEOUT",
+					c.Identity.TokenRequest.ExpirationSeconds,
+					tokenLifetime,
+					suiteTimeout,
+				)
 			}
 		}
 	}
 	if !dryRun && c.AuthMode != AuthModeNone && !c.Identity.TokenRequest.IsEnabled() {
-		return fmt.Errorf("configuration validation failed: identity.tokenRequest.serviceAccountName is required when AUTH_MODE=%s because E2E clients use machine ServiceAccount tokens", c.AuthMode)
+		return fmt.Errorf(
+			"configuration validation failed: identity.tokenRequest.serviceAccountName is required when AUTH_MODE=%s "+
+				"because E2E clients use machine ServiceAccount tokens",
+			c.AuthMode,
+		)
 	}
 
 	return nil

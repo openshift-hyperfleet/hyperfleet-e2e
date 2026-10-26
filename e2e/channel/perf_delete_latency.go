@@ -23,14 +23,20 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Delete latency",
 		ginkgo.It("should delete a channel within acceptable latency", func(ctx context.Context) {
 			channelIDs := make([]string, helper.DefaultSamples)
 			for i := range channelIDs {
-				channel, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
+				channel, err := h.Client.CreateChannelFromPayload(
+					ctx,
+					h.TestDataPath("payloads/channels/channel-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(channel.Id).NotTo(BeNil(), "channel ID should be set")
-				channelIDs[i] = *channel.Id
-				h.DeferCleanup(h.Entities.MustGet("Channel"), "", *channel.Id)
+				Expect(channel.ID).NotTo(BeNil(), "channel ID should be set")
+				channelIDs[i] = *channel.ID
+				h.DeferCleanup(h.Entities.MustGet("Channel"), "", *channel.ID)
 			}
 
-			helper.MeasureMedianLatency("DELETE /channels/{id}", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Channel").Thresholds.Delete), len(channelIDs),
+			helper.MeasureMedianLatency(
+				"DELETE /channels/{id}",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("Channel").Thresholds.Delete),
+				len(channelIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteChannel(ctx, channelIDs[i])
 					Expect(err).NotTo(HaveOccurred())

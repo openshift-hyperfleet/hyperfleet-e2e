@@ -25,16 +25,25 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 
 			// Get or create cluster for nodepool tests
 			var err error
-			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(
+				ctx,
+				h.Entities.MustGet("Cluster"),
+				"",
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to get test cluster")
 			ginkgo.GinkgoWriter.Printf("Using cluster ID: %s\n", clusterID)
 
 			// Create nodepool for all tests in this suite
-			nodepool, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
+			nodepool, err := h.Client.CreateNodePoolFromPayload(
+				ctx,
+				clusterID,
+				h.TestDataPath("payloads/nodepools/nodepool-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create nodepool")
-			Expect(nodepool.Id).NotTo(BeNil(), "nodepool ID should be generated")
+			Expect(nodepool.ID).NotTo(BeNil(), "nodepool ID should be generated")
 			Expect(nodepool.Name).NotTo(BeEmpty(), "nodepool name should be present")
-			nodepoolID = *nodepool.Id
+			nodepoolID = *nodepool.ID
 			nodepoolName = nodepool.Name
 			ginkgo.GinkgoWriter.Printf("Created nodepool ID: %s, Name: %s\n", nodepoolID, nodepoolName)
 		})
@@ -99,8 +108,10 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 
 							// Validate condition metadata for each condition
 							for _, condition := range adapter.Conditions {
-								// architecture adapter-lifecycle-delete-design.md: when not deleting, Finalized=False "reason/message is meaningless".
-								if condition.Type != client.ConditionTypeFinalized || condition.Status != client.AdapterConditionStatusFalse {
+								// architecture adapter-lifecycle-delete-design.md: when not deleting, Finalized=False
+								// "reason/message is meaningless".
+								if condition.Type != client.ConditionTypeFinalized ||
+									condition.Status != client.AdapterConditionStatusFalse {
 									g.Expect(condition.Reason).NotTo(BeNil(),
 										"adapter %s condition %s should have non-nil reason", adapter.Adapter, condition.Type)
 									g.Expect(*condition.Reason).NotTo(BeEmpty(),
@@ -119,9 +130,14 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 					}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 
 					ginkgo.By("Verify final nodepool state")
-					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are True
+					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are
+					// True
 					// This confirms the nodepool has reached the desired end state
-					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(
+						h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+						h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+						h.Cfg.Polling.Interval,
+					).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					finalNodePool, err := h.Client.GetNodePool(ctx, clusterID, nodepoolID)
@@ -138,7 +154,8 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 
 					// Validate observedGeneration for Reconciled and LastKnownReconciled conditions
 					for _, condition := range finalNodePool.Status.Conditions {
-						if condition.Type == client.ConditionTypeReconciled || condition.Type == client.ConditionTypeLastKnownReconciled {
+						if condition.Type == client.ConditionTypeReconciled ||
+							condition.Type == client.ConditionTypeLastKnownReconciled {
 							Expect(condition.ObservedGeneration).To(Equal(int32(1)),
 								"nodepool condition %s should have observed_generation=1 for new creation request", condition.Type)
 						}
@@ -161,55 +178,72 @@ var _ = ginkgo.Describe("[Suite: nodepool][baseline] NodePool Resource Type Life
 				})
 		})
 
-		ginkgo.Describe("K8s Resources Check Aligned with Preinstalled NodePool Related Adapters Specified", ginkgo.Label(labels.Tier0), func() {
-			// This test validates Kubernetes resource creation for all configured adapters:
-			// 1. Direct K8s resource verification for each adapter (configmap)
-			// 2. Validation of resource metadata (labels, annotations) and status
-			ginkgo.It("should create Kubernetes resources with correct templated values for all required adapters",
-				func(ctx context.Context) {
-					ginkgo.By("Verify Kubernetes resources for each required adapter")
+		ginkgo.Describe(
+			"K8s Resources Check Aligned with Preinstalled NodePool Related Adapters Specified",
+			ginkgo.Label(labels.Tier0),
+			func() {
+				// This test validates Kubernetes resource creation for all configured adapters:
+				// 1. Direct K8s resource verification for each adapter (configmap)
+				// 2. Validation of resource metadata (labels, annotations) and status
+				ginkgo.It("should create Kubernetes resources with correct templated values for all required adapters",
+					func(ctx context.Context) {
+						ginkgo.By("Verify Kubernetes resources for each required adapter")
 
-					// Map from adapter name to K8s resource verification function.
-					// Labels are used to FIND resources (via kubectl label selector).
-					// Annotations are explicitly verified since they're not used in selectors.
-					adapterResourceVerifiers := map[string]func() error{
-						"np-configmap": func() error {
-							expectedLabels := map[string]string{
-								"hyperfleet.io/cluster-id":    clusterID,
-								"hyperfleet.io/nodepool-id":   nodepoolID,
-								"hyperfleet.io/nodepool-name": nodepoolName,
-								"hyperfleet.io/resource-type": "configmap",
-							}
-							expectedAnnotations := map[string]string{
-								"hyperfleet.io/generation": "1",
-							}
-							return h.VerifyConfigMap(ctx, clusterID, expectedLabels, expectedAnnotations)
-						},
-					}
-
-					// Verify K8s resources for each configured adapter using Eventually
-					for _, adapterName := range h.Entities.MustGet("NodePool").RequiredAdapters {
-						verifier, exists := adapterResourceVerifiers[adapterName]
-						if !exists {
-							ginkgo.Fail(fmt.Sprintf("No K8s resource verifier defined for adapter %s - test configuration error", adapterName))
+						// Map from adapter name to K8s resource verification function.
+						// Labels are used to FIND resources (via kubectl label selector).
+						// Annotations are explicitly verified since they're not used in selectors.
+						adapterResourceVerifiers := map[string]func() error{
+							"np-configmap": func() error {
+								expectedLabels := map[string]string{
+									"hyperfleet.io/cluster-id":    clusterID,
+									"hyperfleet.io/nodepool-id":   nodepoolID,
+									"hyperfleet.io/nodepool-name": nodepoolName,
+									"hyperfleet.io/resource-type": "configmap",
+								}
+								expectedAnnotations := map[string]string{
+									"hyperfleet.io/generation": "1",
+								}
+								return h.VerifyConfigMap(ctx, clusterID, expectedLabels, expectedAnnotations)
+							},
 						}
 
-						ginkgo.By("Verifying Kubernetes resource for adapter: " + adapterName)
-						Eventually(func() error {
-							return verifier()
-						}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed(),
-							"Kubernetes resource for adapter %s should be created and reach desired state", adapterName)
-						ginkgo.GinkgoWriter.Printf("Successfully verified K8s resource for adapter: %s\n", adapterName)
-					}
+						// Verify K8s resources for each configured adapter using Eventually
+						for _, adapterName := range h.Entities.MustGet("NodePool").RequiredAdapters {
+							verifier, exists := adapterResourceVerifiers[adapterName]
+							if !exists {
+								ginkgo.Fail(
+									fmt.Sprintf(
+										"No K8s resource verifier defined for adapter %s - test configuration error",
+										adapterName,
+									),
+								)
+							}
 
-					ginkgo.By("Verify Final NodePool State")
-					// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions are True
-					// This confirms the nodepool workflow completed successfully and all K8s resources were created
-					// Without this, adapters may still be creating resources during cleanup
-					Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
-						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
-				})
-		})
+							ginkgo.By("Verifying Kubernetes resource for adapter: " + adapterName)
+							Eventually(func() error {
+								return verifier()
+							}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed(),
+								"Kubernetes resource for adapter %s should be created and reach desired state", adapterName)
+							ginkgo.GinkgoWriter.Printf(
+								"Successfully verified K8s resource for adapter: %s\n",
+								adapterName,
+							)
+						}
+
+						ginkgo.By("Verify Final NodePool State")
+						// Wait for nodepool Reconciled condition and verify both Reconciled and Available conditions
+						// are True
+						// This confirms the nodepool workflow completed successfully and all K8s resources were created
+						// Without this, adapters may still be creating resources during cleanup
+						Eventually(
+							h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+							h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+							h.Cfg.Polling.Interval,
+						).
+							Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
+					})
+			},
+		)
 
 		ginkgo.AfterAll(func(ctx context.Context) {
 			if h == nil || clusterID == "" {

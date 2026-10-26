@@ -25,7 +25,7 @@ func (h *Helper) TestDataPath(relativePath string) string {
 }
 
 // ExpectedIdentity returns the configured expected audit identity value.
-// Returns empty string if not configured, signalling callers to skip audit assertions.
+// Returns empty string if not configured, signaling callers to skip audit assertions.
 func (h *Helper) ExpectedIdentity() string {
 	return h.Cfg.Identity.ExpectedIdentity
 }

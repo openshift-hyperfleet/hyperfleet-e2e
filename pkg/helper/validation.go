@@ -7,12 +7,20 @@ import (
 )
 
 // HasAdapterCondition checks if an adapter condition with the given type and status exists in the conditions list
-func (h *Helper) HasAdapterCondition(conditions []client.AdapterCondition, condType string, status client.AdapterConditionStatus) bool {
+func (h *Helper) HasAdapterCondition(
+	conditions []client.AdapterCondition,
+	condType string,
+	status client.AdapterConditionStatus,
+) bool {
 	return hasAdapterCond(conditions, condType, status)
 }
 
 // HasResourceCondition checks if a resource condition with the given type and status exists in the conditions list
-func (h *Helper) HasResourceCondition(conditions []client.ResourceCondition, condType string, status client.ResourceConditionStatus) bool {
+func (h *Helper) HasResourceCondition(
+	conditions []client.ResourceCondition,
+	condType string,
+	status client.ResourceConditionStatus,
+) bool {
 	for _, cond := range conditions {
 		if cond.Type == condType && cond.Status == status {
 			return true

@@ -31,7 +31,11 @@ const (
 // other finalizers. Removing a finalizer that is not there is a no-op.
 var (
 	addHoldFinalizerPatch    = fmt.Appendf(nil, `{"metadata":{"finalizers":[%q]}}`, remoteHoldFinalizer)
-	removeHoldFinalizerPatch = fmt.Appendf(nil, `{"metadata":{"$deleteFromPrimitiveList/finalizers":[%q]}}`, remoteHoldFinalizer)
+	removeHoldFinalizerPatch = fmt.Appendf(
+		nil,
+		`{"metadata":{"$deleteFromPrimitiveList/finalizers":[%q]}}`,
+		remoteHoldFinalizer,
+	)
 )
 
 // The remote adapter (h.Cfg.Desire.Adapter) delivers through the desire store and the
@@ -82,21 +86,34 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 		ginkgo.It("should create a cluster's resources through the applier and report their status",
 			func(ctx context.Context) {
 				ginkgo.By("creating a cluster")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
-				clusterID = *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be generated")
+				clusterID = *cluster.ID
 				createdIDs = append(createdIDs, clusterID) // deleted by the cleanup registered in BeforeAll
 				generation = cluster.Generation
 				Expect(generation).To(Equal(int32(1)), "a new cluster should have generation 1")
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				ginkgo.By("waiting for the cluster to become Reconciled")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-				ginkgo.By("verifying the remote adapter reports Applied, Available and Health True at the cluster generation")
-				Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				ginkgo.By(
+					"verifying the remote adapter reports Applied, Available and Health True at the cluster generation",
+				)
+				Eventually(
+					h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveAllAdaptersAtGeneration([]string{adapter}, generation))
 
 				ginkgo.By("verifying the applier created both objects")
@@ -158,8 +175,8 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 
 				ginkgo.By("waiting for the applier to delete the held ConfigMap")
 				Eventually(func(g Gomega) {
-					configMap, err := h.K8sClient.FetchConfigMap(ctx, remote, remoteConfigMapName)
-					g.Expect(err).NotTo(HaveOccurred())
+					configMap, fetchErr := h.K8sClient.FetchConfigMap(ctx, remote, remoteConfigMapName)
+					g.Expect(fetchErr).NotTo(HaveOccurred())
 					g.Expect(configMap.DeletionTimestamp).NotTo(BeNil(),
 						"ConfigMap %s/%s should be marked for deletion", remote, remoteConfigMapName)
 				}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
@@ -169,18 +186,21 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				// discards, so the API still shows the pre-delete status.
 				ginkgo.By("verifying the cluster is not finalized while the ConfigMap is held")
 				Consistently(func(g Gomega) {
-					status, err := h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID)()
-					g.Expect(err).NotTo(HaveOccurred())
+					status, pollErr := h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID)()
+					g.Expect(pollErr).NotTo(HaveOccurred())
 					g.Expect(status).To(Equal(http.StatusOK), "cluster %s should not be hard-deleted", clusterID)
 
-					namespace, err := h.K8sClient.FetchNamespace(ctx, remote)
-					g.Expect(err).NotTo(HaveOccurred())
+					namespace, fetchErr := h.K8sClient.FetchNamespace(ctx, remote)
+					g.Expect(fetchErr).NotTo(HaveOccurred())
 					g.Expect(namespace.DeletionTimestamp).To(BeNil(),
 						"Namespace %s should not be deleted before its ConfigMap is confirmed deleted", remote)
 
-					statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred())
-					i := slices.IndexFunc(statuses.Items, func(s client.AdapterStatus) bool { return s.Adapter == adapter })
+					statuses, statusesErr := h.Client.GetClusterStatuses(ctx, clusterID)
+					g.Expect(statusesErr).NotTo(HaveOccurred())
+					i := slices.IndexFunc(
+						statuses.Items,
+						func(s client.AdapterStatus) bool { return s.Adapter == adapter },
+					)
 					g.Expect(i).NotTo(Equal(-1), "adapter %s should be present in statuses", adapter)
 					g.Expect(h.HasAdapterCondition(statuses.Items[i].Conditions,
 						client.ConditionTypeFinalized, client.AdapterConditionStatusTrue)).To(BeFalse(),
@@ -197,7 +217,11 @@ var _ = ginkgo.Describe("[Suite: adapter][remote-transport] Adapter Framework - 
 				// Hard-delete runs inside the status POST that computes Reconciled=True from
 				// the required adapters' Finalized=True, so the 404 proves the adapter
 				// finalized; Finalized=True itself may never be observable.
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Deleted,
+					h.Cfg.Polling.Interval,
+				).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.By("checking once, without retry, that the remote Namespace is gone")

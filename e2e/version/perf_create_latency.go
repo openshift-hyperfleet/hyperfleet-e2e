@@ -23,8 +23,8 @@ var _ = ginkgo.Describe("[Suite: version][perf] Create latency",
 			ginkgo.By("creating parent channel")
 			ch, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(ch.Id).NotTo(BeNil(), "channel ID should be set")
-			channelID = *ch.Id
+			Expect(ch.ID).NotTo(BeNil(), "channel ID should be set")
+			channelID = *ch.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {
@@ -34,12 +34,19 @@ var _ = ginkgo.Describe("[Suite: version][perf] Create latency",
 		})
 
 		ginkgo.It("should create a version within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("POST /channels/{parent_id}/versions", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Version").Thresholds.Create), helper.DefaultSamples,
+			helper.MeasureMedianLatency(
+				"POST /channels/{parent_id}/versions",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("Version").Thresholds.Create),
+				helper.DefaultSamples,
 				func(int) {
 					// No per-version cleanup: the channel's DeferCleanup above sweeps all its versions.
-					version, err := h.Client.CreateVersionFromPayload(ctx, channelID, h.TestDataPath("payloads/versions/version-request.json"))
+					version, err := h.Client.CreateVersionFromPayload(
+						ctx,
+						channelID,
+						h.TestDataPath("payloads/versions/version-request.json"),
+					)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(version.Id).NotTo(BeNil(), "version ID should be set")
+					Expect(version.ID).NotTo(BeNil(), "version ID should be set")
 				},
 			)
 		})

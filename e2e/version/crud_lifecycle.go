@@ -25,16 +25,20 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 			ginkgo.By("creating parent channel")
 			ch, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create channel")
-			Expect(ch.Id).NotTo(BeNil(), "channel ID should not be nil")
-			channelID = *ch.Id
+			Expect(ch.ID).NotTo(BeNil(), "channel ID should not be nil")
+			channelID = *ch.ID
 			ginkgo.GinkgoWriter.Printf("Created parent channel ID: %s\n", channelID)
 
 			ginkgo.By("creating version under channel")
-			version, err = h.Client.CreateVersionFromPayload(ctx, channelID, h.TestDataPath("payloads/versions/version-request.json"))
+			version, err = h.Client.CreateVersionFromPayload(
+				ctx,
+				channelID,
+				h.TestDataPath("payloads/versions/version-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create version")
-			Expect(version.Id).NotTo(BeNil(), "version ID should be generated")
+			Expect(version.ID).NotTo(BeNil(), "version ID should be generated")
 			Expect(version.Name).NotTo(BeEmpty(), "version name should be present")
-			versionID = *version.Id
+			versionID = *version.ID
 			ginkgo.GinkgoWriter.Printf("Created version ID: %s, Name: %s\n", versionID, version.Name)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -55,7 +59,7 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 			fetched, err := h.Client.GetVersion(ctx, channelID, versionID)
 			Expect(err).NotTo(HaveOccurred(), "failed to get version")
 
-			Expect(*fetched.Id).To(Equal(versionID))
+			Expect(*fetched.ID).To(Equal(versionID))
 			Expect(fetched.Name).To(Equal(version.Name))
 			Expect(fetched.Kind).To(Equal("Version"))
 			Expect(fetched.Generation).To(Equal(int32(1)))
@@ -70,7 +74,7 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 			ginkgo.By("verifying created version appears in list")
 			found := false
 			for _, v := range list.Items {
-				if v.Id != nil && *v.Id == versionID {
+				if v.ID != nil && *v.ID == versionID {
 					found = true
 					break
 				}
@@ -112,7 +116,7 @@ var _ = ginkgo.Describe("[Suite: version][crud] Version CRUD Lifecycle",
 			fetched, err := h.Client.ListVersions(ctx, channelID, "labels.crud='"+versionID+"'")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fetched.Items).To(HaveLen(1), "should have 1 version")
-			Expect(fetched.Items[0].Id).To(HaveValue(Equal(versionID)))
+			Expect(fetched.Items[0].ID).To(HaveValue(Equal(versionID)))
 		})
 
 		ginkgo.It("should delete version", func(ctx context.Context) {

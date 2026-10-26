@@ -25,21 +25,35 @@ var _ = ginkgo.Describe("[Suite: wifconfig][delete-restrict] WIF Config Deletion
 			h = helper.New()
 
 			ginkgo.By("creating a WIF config")
-			wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
+			wifConfig, err := h.Client.CreateWifConfigFromPayload(
+				ctx,
+				h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create wifconfig")
-			Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be generated")
-			wifConfigID = *wifConfig.Id
+			Expect(wifConfig.ID).NotTo(BeNil(), "wifconfig ID should be generated")
+			wifConfigID = *wifConfig.ID
 			ginkgo.GinkgoWriter.Printf("Created wifconfig ID: %s, Name: %s\n", wifConfigID, wifConfig.Name)
 
 			ginkgo.By("creating a cluster that references the WIF config")
-			cluster, err := h.Client.CreateResourceFromPayloadWith(ctx, client.ClustersPath,
+			cluster, err := h.Client.CreateResourceFromPayloadWith(
+				ctx,
+				client.ClustersPath,
 				h.TestDataPath("payloads/clusters/cluster-request.json"),
-				map[string]any{"references": map[string]any{"wif_config": []map[string]any{{"id": wifConfigID, "kind": "WifConfig"}}}},
+				map[string]any{
+					"references": map[string]any{
+						"wif_config": []map[string]any{{"id": wifConfigID, "kind": "WifConfig"}},
+					},
+				},
 			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster referencing wifconfig")
-			Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
-			clusterID = *cluster.Id
-			ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s (references wifconfig %s)\n", clusterID, cluster.Name, wifConfigID)
+			Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be generated")
+			clusterID = *cluster.ID
+			ginkgo.GinkgoWriter.Printf(
+				"Created cluster ID: %s, Name: %s (references wifconfig %s)\n",
+				clusterID,
+				cluster.Name,
+				wifConfigID,
+			)
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("WifConfig"), "", wifConfigID); err != nil {
@@ -64,7 +78,11 @@ var _ = ginkgo.Describe("[Suite: wifconfig][delete-restrict] WIF Config Deletion
 			Expect(err).NotTo(HaveOccurred(), "failed to delete cluster")
 
 			ginkgo.By("waiting for cluster hard-delete")
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
+			Eventually(
+				h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Deleted,
+				h.Cfg.Polling.Interval,
+			).
 				Should(Equal(http.StatusNotFound), "cluster should be hard-deleted")
 
 			ginkgo.By("deleting the wifconfig after cluster is gone")
@@ -88,9 +106,15 @@ var _ = ginkgo.Describe("[Suite: wifconfig][negative] Cluster Creation With Inva
 			nonExistentID := uuid.NewString()
 
 			ginkgo.By("attempting to create a cluster referencing a non-existent wifconfig")
-			_, err := h.Client.CreateResourceFromPayloadWith(ctx, client.ClustersPath,
+			_, err := h.Client.CreateResourceFromPayloadWith(
+				ctx,
+				client.ClustersPath,
 				h.TestDataPath("payloads/clusters/cluster-request.json"),
-				map[string]any{"references": map[string]any{"wif_config": []map[string]any{{"id": nonExistentID, "kind": "WifConfig"}}}},
+				map[string]any{
+					"references": map[string]any{
+						"wif_config": []map[string]any{{"id": nonExistentID, "kind": "WifConfig"}},
+					},
+				},
 			)
 			var httpErr *client.HTTPError
 			Expect(errors.As(err, &httpErr)).To(BeTrue(), "error should be HTTPError")

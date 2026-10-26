@@ -52,7 +52,11 @@ func (m *resourceConditionMatcher) NegatedFailureMessage(_ any) string {
 
 // HaveAllAdaptersWithCondition matches an *AdapterStatusList where every required
 // adapter has the specified condition type and status.
-func HaveAllAdaptersWithCondition(requiredAdapters []string, condType string, status client.AdapterConditionStatus) types.GomegaMatcher {
+func HaveAllAdaptersWithCondition(
+	requiredAdapters []string,
+	condType string,
+	status client.AdapterConditionStatus,
+) types.GomegaMatcher {
 	return &allAdaptersConditionMatcher{
 		adapters: requiredAdapters,
 		condType: condType,
@@ -114,8 +118,8 @@ func HaveAllAdaptersAtGeneration(requiredAdapters []string, generation int32) ty
 
 type allAdaptersGenerationMatcher struct {
 	adapters   []string
-	generation int32
 	failures   []string
+	generation int32
 }
 
 func (m *allAdaptersGenerationMatcher) Match(actual any) (bool, error) {
@@ -140,7 +144,10 @@ func (m *allAdaptersGenerationMatcher) Match(actual any) (bool, error) {
 			continue
 		}
 		if adapter.ObservedGeneration != m.generation {
-			m.failures = append(m.failures, fmt.Sprintf("%s: generation %d (want %d)", name, adapter.ObservedGeneration, m.generation))
+			m.failures = append(
+				m.failures,
+				fmt.Sprintf("%s: generation %d (want %d)", name, adapter.ObservedGeneration, m.generation),
+			)
 			continue
 		}
 		for _, ct := range []string{client.ConditionTypeApplied, client.ConditionTypeAvailable, client.ConditionTypeHealth} {
@@ -263,7 +270,11 @@ func (m *rfc9457ErrorMatcher) Match(actual any) (bool, error) {
 		m.body = string(bodyBytes)
 	}
 
-	mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	mediaType, _, parseErr := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if parseErr != nil {
+		m.actual = fmt.Sprintf("invalid Content-Type=%q: %v", resp.Header.Get("Content-Type"), parseErr)
+		return false, nil
+	}
 	if mediaType != "application/problem+json" {
 		m.actual = fmt.Sprintf("Content-Type=%q (not application/problem+json)", resp.Header.Get("Content-Type"))
 		return false, nil

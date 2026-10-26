@@ -22,11 +22,14 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 			h = helper.New()
 
 			// Create cluster for all tests in this suite
-			cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			cluster, err := h.Client.CreateClusterFromPayload(
+				ctx,
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-			Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
+			Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be generated")
 			Expect(cluster.Name).NotTo(BeEmpty(), "cluster name should be present")
-			clusterID = *cluster.Id
+			clusterID = *cluster.ID
 			clusterName = cluster.Name
 			ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, clusterName)
 
@@ -101,8 +104,10 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 
 							// Validate condition metadata for each condition
 							for _, condition := range adapter.Conditions {
-								// architecture adapter-lifecycle-delete-design.md: when not deleting, Finalized=False "reason/message is meaningless".
-								if condition.Type != client.ConditionTypeFinalized || condition.Status != client.AdapterConditionStatusFalse {
+								// architecture adapter-lifecycle-delete-design.md: when not deleting, Finalized=False
+								// "reason/message is meaningless".
+								if condition.Type != client.ConditionTypeFinalized ||
+									condition.Status != client.AdapterConditionStatusFalse {
 									g.Expect(condition.Reason).NotTo(BeNil(),
 										"adapter %s condition %s should have non-nil reason", adapter.Adapter, condition.Type)
 									g.Expect(*condition.Reason).NotTo(BeEmpty(),
@@ -121,9 +126,14 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 					}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed())
 
 					ginkgo.By("Verify final cluster state")
-					// Wait for cluster Reconciled condition and verify both Reconciled and Available conditions are True
+					// Wait for cluster Reconciled condition and verify both Reconciled and Available conditions are
+					// True
 					// This confirms the cluster has reached the desired end state
-					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(
+						h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+						h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+						h.Cfg.Polling.Interval,
+					).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					finalCluster, err := h.Client.GetCluster(ctx, clusterID)
@@ -140,14 +150,16 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 
 					// Validate observedGeneration for Reconciled and LastKnownReconciled conditions
 					for _, condition := range finalCluster.Status.Conditions {
-						if condition.Type == client.ConditionTypeReconciled || condition.Type == client.ConditionTypeLastKnownReconciled {
+						if condition.Type == client.ConditionTypeReconciled ||
+							condition.Type == client.ConditionTypeLastKnownReconciled {
 							Expect(condition.ObservedGeneration).To(Equal(int32(1)),
 								"cluster condition %s should have observed_generation=1 for new creation request", condition.Type)
 						}
 					}
 
 					// Validate adapter-specific conditions in cluster status
-					// Each required adapter should report its own condition type (e.g., ClNamespaceSuccessful, ClJobSuccessful)
+					// Each required adapter should report its own condition type (e.g., ClNamespaceSuccessful,
+					// ClJobSuccessful)
 					for _, adapterName := range h.Entities.MustGet("Cluster").RequiredAdapters {
 						expectedCondType := h.AdapterNameToConditionType(adapterName)
 						hasAdapterCondition := h.HasResourceCondition(
@@ -162,74 +174,87 @@ var _ = ginkgo.Describe("[Suite: cluster][baseline] Cluster Resource Type Lifecy
 				})
 		})
 
-		ginkgo.Describe("K8s Resources Check Aligned with Preinstalled Clusters Related Adapters Specified", ginkgo.Label(labels.Tier0), func() {
-			// This test validates Kubernetes resource creation for adapters that create K8s resources:
-			// 1. Direct K8s resource verification for each adapter (namespace, job, deployment)
-			// 2. Validation of resource metadata (labels, annotations) and status
-			// 3. Final cluster state verification
-			//
-			// Note: Not all adapters create K8s resources themselves (e.g., cl-desire delivers through the
-			// desire store and the applier). Such adapters are verified via adapter status in "Basic Workflow
-			// Validation" test; the remote-transport suite checks the objects the applier writes for cl-desire.
-			ginkgo.It("should create Kubernetes resources with correct templated values for adapters that create K8s resources",
-				func(ctx context.Context) {
-					ginkgo.By("Verify Kubernetes resources for each required adapter")
+		ginkgo.Describe(
+			"K8s Resources Check Aligned with Preinstalled Clusters Related Adapters Specified",
+			ginkgo.Label(labels.Tier0),
+			func() {
+				// This test validates Kubernetes resource creation for adapters that create K8s resources:
+				// 1. Direct K8s resource verification for each adapter (namespace, job, deployment)
+				// 2. Validation of resource metadata (labels, annotations) and status
+				// 3. Final cluster state verification
+				//
+				// Note: Not all adapters create K8s resources themselves (e.g., cl-desire delivers through the
+				// desire store and the applier). Such adapters are verified via adapter status in "Basic Workflow
+				// Validation" test; the remote-transport suite checks the objects the applier writes for cl-desire.
+				ginkgo.It(
+					"should create Kubernetes resources with correct templated values for adapters that create K8s resources",
+					func(ctx context.Context) {
+						ginkgo.By("Verify Kubernetes resources for each required adapter")
 
-					// Map from adapter name to K8s resource verification function.
-					// Labels are used to FIND resources (via kubectl label selector).
-					// Annotations are explicitly verified since they're not used in selectors.
-					adapterResourceVerifiers := map[string]func() error{
-						"cl-namespace": func() error {
-							expectedLabels := map[string]string{
-								"hyperfleet.io/cluster-id":     clusterID,
-								"hyperfleet.io/cluster-name":   clusterName,
-								"e2e.hyperfleet.io/managed-by": "test-framework",
-							}
-							expectedAnnotations := map[string]string{
-								"hyperfleet.io/generation": "1",
-							}
-							return h.VerifyNamespaceActive(ctx, clusterID, expectedLabels, expectedAnnotations)
-						},
-						"cl-job": func() error {
-							expectedLabels := map[string]string{
-								"hyperfleet.io/cluster-id":    clusterID,
-								"hyperfleet.io/resource-type": "job",
-							}
-							expectedAnnotations := map[string]string{
-								"hyperfleet.io/generation": "1",
-							}
-							return h.VerifyJobComplete(ctx, clusterID, expectedLabels, expectedAnnotations)
-						},
-						"cl-deployment": func() error {
-							expectedLabels := map[string]string{
-								"hyperfleet.io/cluster-id":    clusterID,
-								"hyperfleet.io/resource-type": "deployment",
-							}
-							expectedAnnotations := map[string]string{
-								"hyperfleet.io/generation": "1",
-							}
-							return h.VerifyDeploymentAvailable(ctx, clusterID, expectedLabels, expectedAnnotations)
-						},
-					}
+						// Map from adapter name to K8s resource verification function.
+						// Labels are used to FIND resources (via kubectl label selector).
+						// Annotations are explicitly verified since they're not used in selectors.
+						adapterResourceVerifiers := map[string]func() error{
+							"cl-namespace": func() error {
+								expectedLabels := map[string]string{
+									"hyperfleet.io/cluster-id":     clusterID,
+									"hyperfleet.io/cluster-name":   clusterName,
+									"e2e.hyperfleet.io/managed-by": "test-framework",
+								}
+								expectedAnnotations := map[string]string{
+									"hyperfleet.io/generation": "1",
+								}
+								return h.VerifyNamespaceActive(ctx, clusterID, expectedLabels, expectedAnnotations)
+							},
+							"cl-job": func() error {
+								expectedLabels := map[string]string{
+									"hyperfleet.io/cluster-id":    clusterID,
+									"hyperfleet.io/resource-type": "job",
+								}
+								expectedAnnotations := map[string]string{
+									"hyperfleet.io/generation": "1",
+								}
+								return h.VerifyJobComplete(ctx, clusterID, expectedLabels, expectedAnnotations)
+							},
+							"cl-deployment": func() error {
+								expectedLabels := map[string]string{
+									"hyperfleet.io/cluster-id":    clusterID,
+									"hyperfleet.io/resource-type": "deployment",
+								}
+								expectedAnnotations := map[string]string{
+									"hyperfleet.io/generation": "1",
+								}
+								return h.VerifyDeploymentAvailable(ctx, clusterID, expectedLabels, expectedAnnotations)
+							},
+						}
 
-					// Verify K8s resources only for adapters that have verifiers defined
-					// This explicitly tests only adapters that create K8s resources
-					for adapterName, verifier := range adapterResourceVerifiers {
-						ginkgo.By("Verifying Kubernetes resource for adapter: " + adapterName)
-						Eventually(func() error {
-							return verifier()
-						}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed(),
-							"Kubernetes resource for adapter %s should be created and reach desired state", adapterName)
-						ginkgo.GinkgoWriter.Printf("Successfully verified K8s resource for adapter: %s\n", adapterName)
-					}
+						// Verify K8s resources only for adapters that have verifiers defined
+						// This explicitly tests only adapters that create K8s resources
+						for adapterName, verifier := range adapterResourceVerifiers {
+							ginkgo.By("Verifying Kubernetes resource for adapter: " + adapterName)
+							Eventually(func() error {
+								return verifier()
+							}, h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).Should(Succeed(),
+								"Kubernetes resource for adapter %s should be created and reach desired state", adapterName)
+							ginkgo.GinkgoWriter.Printf(
+								"Successfully verified K8s resource for adapter: %s\n",
+								adapterName,
+							)
+						}
 
-					ginkgo.By("Verify final cluster state to ensure Reconciled before cleanup")
-					// Wait for cluster Reconciled condition to prevent namespace deletion conflicts
-					// Without this, adapters may still be creating resources during cleanup
-					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
-						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
-				})
-		})
+						ginkgo.By("Verify final cluster state to ensure Reconciled before cleanup")
+						// Wait for cluster Reconciled condition to prevent namespace deletion conflicts
+						// Without this, adapters may still be creating resources during cleanup
+						Eventually(
+							h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+							h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+							h.Cfg.Polling.Interval,
+						).
+							Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
+					},
+				)
+			},
+		)
 
 		ginkgo.Describe("Adapter Dependency Relationships Workflow Validation", ginkgo.Label(labels.Tier0), func() {
 			// This test validates that dependent adapters complete successfully.

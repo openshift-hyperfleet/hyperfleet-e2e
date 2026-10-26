@@ -129,7 +129,8 @@ vet: generate ## Run go vet
 	$(GO) vet ./...
 
 .PHONY: lint
-lint: ## Run golangci-lint
+lint: ## Verify configuration schema and run golangci-lint
+	$(call gotool,golangci-lint) config verify
 	$(call gotool,golangci-lint) run ./...
 
 .PHONY: tools

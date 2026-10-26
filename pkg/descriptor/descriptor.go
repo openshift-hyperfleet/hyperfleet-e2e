@@ -19,9 +19,9 @@ type EntityDescriptor struct {
 	ParentPlural     string // resolved by NewCatalog
 	OnParentDelete   string
 	RequiredAdapters []string
-	Timeouts         EntityTimeouts
-	Thresholds       EntityThresholds
 	Cleanup          CleanupPolicy
+	Thresholds       EntityThresholds
+	Timeouts         EntityTimeouts
 }
 
 type EntityTimeouts struct {
@@ -45,10 +45,10 @@ type EntityThresholds struct {
 // test cleanup choices, not the API's deletion semantics. In particular,
 // IgnoreConflict is a transitional exception, not a default for reference targets.
 type CleanupPolicy struct {
+	ChildKinds        []string // explicitly delete these children before the resource
 	WaitForHardDelete bool
 	IgnoreNotFound    bool
 	IgnoreConflict    bool
-	ChildKinds        []string // explicitly delete these children before the resource
 }
 
 // Catalog owns its entries; lookups return copies so a test cannot change
@@ -150,7 +150,11 @@ func (e EntityDescriptor) Validate() error {
 		return fmt.Errorf("entity %q has required adapters but no reconciled timeout", e.Kind)
 	}
 	if e.Cleanup.WaitForHardDelete && e.Timeouts.Deleted <= 0 {
-		return fmt.Errorf("entity %q requires a positive deleted timeout when waiting for hard-delete, got %s", e.Kind, e.Timeouts.Deleted)
+		return fmt.Errorf(
+			"entity %q requires a positive deleted timeout when waiting for hard-delete, got %s",
+			e.Kind,
+			e.Timeouts.Deleted,
+		)
 	}
 	return nil
 }

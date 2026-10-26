@@ -6,16 +6,21 @@ import (
 	"sort"
 	"strings"
 
+	"log/slog"
+
 	k8sclient "github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client/kubernetes"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"log/slog"
 )
 
 // VerifyNamespaceActive verifies a namespace exists and is in Active phase
-func (h *Helper) VerifyNamespaceActive(ctx context.Context, name string, expectedLabels, expectedAnnotations map[string]string) error {
+func (h *Helper) VerifyNamespaceActive(
+	ctx context.Context,
+	name string,
+	expectedLabels, expectedAnnotations map[string]string,
+) error {
 	slog.Info("verifying namespace status", "namespace", name)
 
 	// Fetch namespace
@@ -46,7 +51,11 @@ func (h *Helper) VerifyNamespaceActive(ctx context.Context, name string, expecte
 // VerifyJobComplete verifies a job exists and has completed successfully.
 // Uses expectedLabels to find the job via label selector - if the list returns a job,
 // it's guaranteed to have those labels (no need to verify them again).
-func (h *Helper) VerifyJobComplete(ctx context.Context, namespace string, expectedLabels, expectedAnnotations map[string]string) error {
+func (h *Helper) VerifyJobComplete(
+	ctx context.Context,
+	namespace string,
+	expectedLabels, expectedAnnotations map[string]string,
+) error {
 	labelSelector := labels.SelectorFromSet(expectedLabels).String()
 	slog.Info("verifying job status", "namespace", namespace, "label_selector", labelSelector)
 
@@ -79,7 +88,11 @@ func (h *Helper) VerifyJobComplete(ctx context.Context, namespace string, expect
 // VerifyDeploymentAvailable verifies a deployment exists and is available.
 // Uses expectedLabels to find the deployment via label selector - if the list returns a deployment,
 // it's guaranteed to have those labels (no need to verify them again).
-func (h *Helper) VerifyDeploymentAvailable(ctx context.Context, namespace string, expectedLabels, expectedAnnotations map[string]string) error {
+func (h *Helper) VerifyDeploymentAvailable(
+	ctx context.Context,
+	namespace string,
+	expectedLabels, expectedAnnotations map[string]string,
+) error {
 	labelSelector := labels.SelectorFromSet(expectedLabels).String()
 	slog.Info("verifying deployment status", "namespace", namespace, "label_selector", labelSelector)
 
@@ -110,7 +123,11 @@ func (h *Helper) VerifyDeploymentAvailable(ctx context.Context, namespace string
 // VerifyConfigMap verifies a configmap exists with expected labels and annotations.
 // Uses expectedLabels to find the configmap via label selector - if the list returns a configmap,
 // it's guaranteed to have those labels (no need to verify them again).
-func (h *Helper) VerifyConfigMap(ctx context.Context, namespace string, expectedLabels, expectedAnnotations map[string]string) error {
+func (h *Helper) VerifyConfigMap(
+	ctx context.Context,
+	namespace string,
+	expectedLabels, expectedAnnotations map[string]string,
+) error {
 	labelSelector := labels.SelectorFromSet(expectedLabels).String()
 	slog.Info("verifying configmap status", "namespace", namespace, "label_selector", labelSelector)
 
@@ -183,7 +200,15 @@ func (h *Helper) ScaleDeploymentBySelector(ctx context.Context, namespace, selec
 		return fmt.Errorf("failed to scale deployment in namespace %s with selector %s: %w", namespace, selector, err)
 	}
 
-	slog.Info("deployment scaled successfully by selector", "namespace", namespace, "selector", selector, "replicas", replicas)
+	slog.Info(
+		"deployment scaled successfully by selector",
+		"namespace",
+		namespace,
+		"selector",
+		selector,
+		"replicas",
+		replicas,
+	)
 	return nil
 }
 
@@ -223,7 +248,12 @@ func (h *Helper) GetDeploymentName(ctx context.Context, namespace, releaseName s
 		return "", fmt.Errorf("no deployment found for release %s in namespace %s", releaseName, namespace)
 	}
 	if len(deployments) > 1 {
-		return "", fmt.Errorf("found %d deployments for release %s in namespace %s, expected 1", len(deployments), releaseName, namespace)
+		return "", fmt.Errorf(
+			"found %d deployments for release %s in namespace %s, expected 1",
+			len(deployments),
+			releaseName,
+			namespace,
+		)
 	}
 	return deployments[0].Name, nil
 }

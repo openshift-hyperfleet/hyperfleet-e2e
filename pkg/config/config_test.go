@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/common"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/cliconfig"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 )
@@ -19,7 +19,7 @@ import (
 // shippedConfig is the configs/config.yaml the image ships and CI runs with.
 var shippedConfig = filepath.Join("..", "..", "configs", "config.yaml")
 
-// loadConfig runs the same loading path as the CLI: common.LoadConfig binds the
+// loadConfig runs the same loading path as the CLI: cliconfig.LoadConfig binds the
 // HYPERFLEET_* env vars, then config.Load unmarshals, applies defaults and validates.
 // viper is process-global, so these tests must not run in parallel.
 func loadConfig(t *testing.T, configFile string, env map[string]string) *config.Config {
@@ -55,7 +55,7 @@ func loadConfigResult(t *testing.T, configFile string, env map[string]string) (*
 		t.Setenv(key, value)
 	}
 
-	if err := common.LoadConfig(configFile); err != nil {
+	if err := cliconfig.LoadConfig(configFile); err != nil {
 		return nil, fmt.Errorf("LoadConfig(%q): %w", configFile, err)
 	}
 	return config.Load()
@@ -400,7 +400,8 @@ func TestEntityAdapterKeys(t *testing.T) {
 			cfg := loadConfig(t, configFile, nil)
 			for _, row := range config.EntityDescriptors() {
 				if got := entity(t, cfg, row.Kind).RequiredAdapters; !slices.Equal(got, row.RequiredAdapters) {
-					t.Errorf("config file %q: %s adapters = %q, want the row default %q", configFile, row.Kind, got, row.RequiredAdapters)
+					t.Errorf("config file %q: %s adapters = %q, want the row default %q",
+						configFile, row.Kind, got, row.RequiredAdapters)
 				}
 			}
 		}
@@ -533,8 +534,16 @@ func TestAPILatencyThreshold(t *testing.T) {
 	}{
 		{name: "API mode keeps the base threshold", mode: config.AuthModeAPI, want: base},
 		{name: "NONE keeps the base threshold", mode: config.AuthModeNone, want: base},
-		{name: "EDGE adds the auth latency allowance", mode: config.AuthModeEdge, want: base + config.DefaultAuthLatencyAllowance},
-		{name: "EDGE+API adds the auth latency allowance", mode: config.AuthModeEdgeAPI, want: base + config.DefaultAuthLatencyAllowance},
+		{
+			name: "EDGE adds the auth latency allowance",
+			mode: config.AuthModeEdge,
+			want: base + config.DefaultAuthLatencyAllowance,
+		},
+		{
+			name: "EDGE+API adds the auth latency allowance",
+			mode: config.AuthModeEdgeAPI,
+			want: base + config.DefaultAuthLatencyAllowance,
+		},
 	}
 
 	for _, tt := range tests {

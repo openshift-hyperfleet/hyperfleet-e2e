@@ -22,7 +22,12 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Create-to-reconciled latency",
 			h = helper.New()
 
 			var err error
-			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(
+				ctx,
+				h.Entities.MustGet("Cluster"),
+				"",
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -36,10 +41,14 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Create-to-reconciled latency",
 			ginkgo.By("creating a nodepool and timing until Reconciled")
 			start := time.Now()
 
-			nodepool, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
+			nodepool, err := h.Client.CreateNodePoolFromPayload(
+				ctx,
+				clusterID,
+				h.TestDataPath("payloads/nodepools/nodepool-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodepool.Id).NotTo(BeNil(), "nodepool ID should be set")
-			nodepoolID := *nodepool.Id
+			Expect(nodepool.ID).NotTo(BeNil(), "nodepool ID should be set")
+			nodepoolID := *nodepool.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID); err != nil {
@@ -47,7 +56,11 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Create-to-reconciled latency",
 				}
 			})
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+				h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 			elapsed := time.Since(start)

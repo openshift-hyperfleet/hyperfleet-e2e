@@ -62,7 +62,10 @@ func TestGenerateAdapterReleaseName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: tt.resourceType}, tt.adapterName)
+			got := GenerateAdapterReleaseName(
+				descriptor.EntityDescriptor{Kind: "Test", Plural: tt.resourceType},
+				tt.adapterName,
+			)
 
 			if len(got) > maxReleaseNameLength {
 				t.Errorf("length %d exceeds max %d: %q", len(got), maxReleaseNameLength, got)
@@ -101,8 +104,14 @@ func TestGenerateAdapterReleaseName_Deterministic(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("%s-%s", tc.resourceType, tc.adapterName), func(t *testing.T) {
-			a := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: tc.resourceType}, tc.adapterName)
-			b := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: tc.resourceType}, tc.adapterName)
+			a := GenerateAdapterReleaseName(
+				descriptor.EntityDescriptor{Kind: "Test", Plural: tc.resourceType},
+				tc.adapterName,
+			)
+			b := GenerateAdapterReleaseName(
+				descriptor.EntityDescriptor{Kind: "Test", Plural: tc.resourceType},
+				tc.adapterName,
+			)
 			if a != b {
 				t.Errorf("non-deterministic output: %q != %q", a, b)
 			}
@@ -114,8 +123,14 @@ func TestGenerateAdapterReleaseName_Deterministic(t *testing.T) {
 // long names sharing a long common prefix produce distinct release names.
 // The hash suffix is what guarantees uniqueness once the base is truncated.
 func TestGenerateAdapterReleaseName_LongNameCollision(t *testing.T) {
-	a := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: "clusters"}, "adapter-alpha-very-long-name-here")
-	b := GenerateAdapterReleaseName(descriptor.EntityDescriptor{Kind: "Test", Plural: "clusters"}, "adapter-bravo-very-long-name-here")
+	a := GenerateAdapterReleaseName(
+		descriptor.EntityDescriptor{Kind: "Test", Plural: "clusters"},
+		"adapter-alpha-very-long-name-here",
+	)
+	b := GenerateAdapterReleaseName(
+		descriptor.EntityDescriptor{Kind: "Test", Plural: "clusters"},
+		"adapter-bravo-very-long-name-here",
+	)
 
 	if a == b {
 		t.Errorf("different inputs produced same release name: %q", a)
@@ -150,7 +165,13 @@ func TestAdapterDescriptorCleanupNames(t *testing.T) {
 		t.Fatalf("wrong broker names: %s, %s", subscription, topic)
 	}
 	deployments := InitAdapterDeploymentList()
-	deployments.Add(AdapterDeployment{ReleaseName: GenerateAdapterReleaseName(entity, "success"), AdapterName: "success", ResourcePlural: entity.Plural})
+	deployments.Add(
+		AdapterDeployment{
+			ReleaseName:    GenerateAdapterReleaseName(entity, "success"),
+			AdapterName:    "success",
+			ResourcePlural: entity.Plural,
+		},
+	)
 	subscription, topic = "", ""
 	sweeper := &CleanupHelper{cfg: cfg, adapterDeploymentList: deployments}
 	if err := sweeper.SweepPubsubTestAdapterResources(t.Context()); err != nil {
@@ -171,12 +192,12 @@ func TestAdapterDescriptorCleanupNames(t *testing.T) {
 
 func TestDeletePubSubTopic(t *testing.T) {
 	tests := []struct {
-		name               string
-		projectID          string
 		deleteErr          error
 		factoryErr         error
-		wantErr            bool
+		name               string
+		projectID          string
 		wantErrMsg         string
+		wantErr            bool
 		wantDefaultProject bool
 	}{
 		{
@@ -223,7 +244,9 @@ func TestDeletePubSubTopic(t *testing.T) {
 			original := newPubSubTopicDeleteFunc
 			t.Cleanup(func() { newPubSubTopicDeleteFunc = original })
 
-			newPubSubTopicDeleteFunc = func(_ context.Context, projectID, _ string) (func(context.Context) error, func(), error) {
+			newPubSubTopicDeleteFunc = func(
+				_ context.Context, projectID, _ string,
+			) (func(context.Context) error, func(), error) {
 				capturedProjectID = projectID
 				if tt.factoryErr != nil {
 					return nil, nil, tt.factoryErr
@@ -257,12 +280,12 @@ func TestDeletePubSubTopic(t *testing.T) {
 
 func TestDeletePubSubSubscription(t *testing.T) {
 	tests := []struct {
-		name               string
-		projectID          string
 		deleteErr          error
 		factoryErr         error
-		wantErr            bool
+		name               string
+		projectID          string
 		wantErrMsg         string
+		wantErr            bool
 		wantDefaultProject bool
 	}{
 		{
@@ -354,14 +377,20 @@ func TestAdapterHelmSetArgs(t *testing.T) {
 		wantAbsent     []string // substrings that must NOT appear
 	}{
 		{
-			name:         "EDGE+API enables ServiceAccount auth",
-			authMode:     config.AuthModeEdgeAPI,
-			wantContains: []string{"adapterConfig.hyperfleetApi.auth.enabled=true", "adapterConfig.hyperfleetApi.auth.scheme=ServiceAccount"},
+			name:     "EDGE+API enables ServiceAccount auth",
+			authMode: config.AuthModeEdgeAPI,
+			wantContains: []string{
+				"adapterConfig.hyperfleetApi.auth.enabled=true",
+				"adapterConfig.hyperfleetApi.auth.scheme=ServiceAccount",
+			},
 		},
 		{
-			name:         "EDGE enables ServiceAccount auth",
-			authMode:     config.AuthModeEdge,
-			wantContains: []string{"adapterConfig.hyperfleetApi.auth.enabled=true", "adapterConfig.hyperfleetApi.auth.scheme=ServiceAccount"},
+			name:     "EDGE enables ServiceAccount auth",
+			authMode: config.AuthModeEdge,
+			wantContains: []string{
+				"adapterConfig.hyperfleetApi.auth.enabled=true",
+				"adapterConfig.hyperfleetApi.auth.scheme=ServiceAccount",
+			},
 		},
 		{
 			name:         "API enables auth and leaves chart scheme default",
@@ -373,7 +402,10 @@ func TestAdapterHelmSetArgs(t *testing.T) {
 			name:           "NONE disables auth even when TokenRequest is configured",
 			authMode:       config.AuthModeNone,
 			tokenRequestSA: "hyperfleet-e2e-runner",
-			wantAbsent:     []string{"adapterConfig.hyperfleetApi.auth.enabled", "adapterConfig.hyperfleetApi.auth.scheme="},
+			wantAbsent: []string{
+				"adapterConfig.hyperfleetApi.auth.enabled",
+				"adapterConfig.hyperfleetApi.auth.scheme=",
+			},
 		},
 		{
 			name:           "unset mode preserves TokenRequest auth and chart scheme default",
@@ -382,8 +414,11 @@ func TestAdapterHelmSetArgs(t *testing.T) {
 			wantAbsent:     []string{"adapterConfig.hyperfleetApi.auth.scheme="},
 		},
 		{
-			name:       "unset mode without TokenRequest omits auth settings",
-			wantAbsent: []string{"adapterConfig.hyperfleetApi.auth.enabled", "adapterConfig.hyperfleetApi.auth.scheme="},
+			name: "unset mode without TokenRequest omits auth settings",
+			wantAbsent: []string{
+				"adapterConfig.hyperfleetApi.auth.enabled",
+				"adapterConfig.hyperfleetApi.auth.scheme=",
+			},
 		},
 		{
 			name:         "includes fullnameOverride",

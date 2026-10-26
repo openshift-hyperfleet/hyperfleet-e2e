@@ -50,13 +50,17 @@ func TestAllE2ETestsHaveRequiredLabels(t *testing.T) {
 func TestValidateLabels(t *testing.T) {
 	tests := []struct {
 		name    string
-		labels  []string
 		wantErr string
+		labels  []string
 	}{
 		{name: "severity only", labels: []string{labels.Tier0}},
 		{name: "severity with optional labels", labels: []string{labels.Tier2, labels.Negative, labels.Disruptive}},
 		{name: "no labels", labels: nil, wantErr: "missing severity label"},
-		{name: "optional labels without severity", labels: []string{labels.Negative}, wantErr: "missing severity label"},
+		{
+			name:    "optional labels without severity",
+			labels:  []string{labels.Negative},
+			wantErr: "missing severity label",
+		},
 	}
 
 	for _, tt := range tests {
@@ -78,8 +82,8 @@ func TestValidateLabels(t *testing.T) {
 // testSpec represents a Ginkgo test specification with its labels
 type testSpec struct {
 	Name   string   // Test name from ginkgo.Describe
-	Labels []string // Labels from ginkgo.Label()
 	File   string   // Source file path
+	Labels []string // Labels from ginkgo.Label()
 }
 
 // collectTestSpecs walks the e2e directory and extracts all ginkgo.Describe specs with their labels

@@ -27,14 +27,18 @@ var _ = ginkgo.Describe("[Suite: channel][delete-restrict] Channel Deletion Bloc
 			ch, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
 			Expect(err).NotTo(HaveOccurred(), "failed to create channel")
 			Expect(ch).NotTo(BeNil(), "created channel should not be nil")
-			Expect(ch.Id).NotTo(BeNil(), "channel ID should not be nil")
-			channelID = *ch.Id
+			Expect(ch.ID).NotTo(BeNil(), "channel ID should not be nil")
+			channelID = *ch.ID
 
-			ver, err := h.Client.CreateVersionFromPayload(ctx, channelID, h.TestDataPath("payloads/versions/version-request.json"))
+			ver, err := h.Client.CreateVersionFromPayload(
+				ctx,
+				channelID,
+				h.TestDataPath("payloads/versions/version-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create version")
 			Expect(ver).NotTo(BeNil(), "created version should not be nil")
-			Expect(ver.Id).NotTo(BeNil(), "version ID should not be nil")
-			versionID = *ver.Id
+			Expect(ver.ID).NotTo(BeNil(), "version ID should not be nil")
+			versionID = *ver.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {

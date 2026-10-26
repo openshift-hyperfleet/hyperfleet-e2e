@@ -22,10 +22,13 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Update latency",
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			h = helper.New()
 
-			channel, err := h.Client.CreateChannelFromPayload(ctx, h.TestDataPath("payloads/channels/channel-request.json"))
+			channel, err := h.Client.CreateChannelFromPayload(
+				ctx,
+				h.TestDataPath("payloads/channels/channel-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(channel.Id).NotTo(BeNil(), "channel ID should be set")
-			channelID = *channel.Id
+			Expect(channel.ID).NotTo(BeNil(), "channel ID should be set")
+			channelID = *channel.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Channel"), "", channelID); err != nil {
@@ -35,7 +38,10 @@ var _ = ginkgo.Describe("[Suite: channel][perf] Update latency",
 		})
 
 		ginkgo.It("should update a channel within acceptable latency", func(ctx context.Context) {
-			helper.MeasureMedianLatency("PATCH /channels/{id}", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Channel").Thresholds.Update), helper.DefaultSamples,
+			helper.MeasureMedianLatency(
+				"PATCH /channels/{id}",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("Channel").Thresholds.Update),
+				helper.DefaultSamples,
 				func(i int) {
 					_, err := h.Client.PatchChannel(ctx, channelID, client.ResourcePatchRequest{
 						Spec: map[string]any{

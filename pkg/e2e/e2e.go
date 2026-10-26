@@ -19,7 +19,7 @@ import (
 func RunTests(ctx context.Context) int {
 	select {
 	case <-ctx.Done():
-		log.Printf("Test execution cancelled: %v", ctx.Err())
+		log.Printf("Test execution canceled: %v", ctx.Err())
 		return 1
 	default:
 	}

@@ -52,7 +52,13 @@ func assertMedianBelowThreshold(name string, threshold time.Duration, durations 
 	if n%2 == 0 {
 		median = (durations[n/2-1] + durations[n/2]) / 2
 	}
-	ginkgo.GinkgoWriter.Printf("[PERF] [proc %d] %s: median=%v (n=%d)\n", ginkgo.GinkgoParallelProcess(), name, median, n)
+	ginkgo.GinkgoWriter.Printf(
+		"[PERF] [proc %d] %s: median=%v (n=%d)\n",
+		ginkgo.GinkgoParallelProcess(),
+		name,
+		median,
+		n,
+	)
 
 	gomega.Expect(median).To(gomega.BeNumerically("<", threshold),
 		"%s exceeded threshold: median=%v threshold=%v", name, median, threshold)

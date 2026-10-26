@@ -1,4 +1,4 @@
-package common
+package cliconfig
 
 import (
 	"fmt"
@@ -29,9 +29,7 @@ func LoadConfig(configFlagValue string) error {
 
 	// 3. Enable HYPERFLEET_* environment variables and the API_ADAPTERS_* and
 	// AUTH_MODE aliases; env vars override config file values
-	config.BindEnvVars()
-
-	return nil
+	return config.BindEnvVars()
 }
 
 // getConfigFilePath determines the config file path following standard priority

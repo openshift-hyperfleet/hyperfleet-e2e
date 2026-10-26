@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/util"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/pointer"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client"
 )
@@ -16,19 +16,19 @@ func TestHaveAuditIdentity(t *testing.T) {
 	other := "someone-else@example.com"
 
 	tests := []struct {
-		name      string
 		actual    any
+		name      string
 		wantMatch bool
 		wantErr   bool
 	}{
 		{
 			name:      "Resource with matching identity",
-			actual:    &client.Resource{CreatedBy: util.ToPtr(expected)},
+			actual:    &client.Resource{CreatedBy: pointer.ToPtr(expected)},
 			wantMatch: true,
 		},
 		{
 			name:      "Resource with mismatched identity",
-			actual:    &client.Resource{CreatedBy: util.ToPtr(other)},
+			actual:    &client.Resource{CreatedBy: pointer.ToPtr(other)},
 			wantMatch: false,
 		},
 		{
@@ -85,22 +85,35 @@ func TestHaveRFC9457Error(t *testing.T) {
 	}
 
 	tests := []struct {
+		actual    any
 		name      string
 		code      string
-		actual    any
 		wantMatch bool
 		wantErr   bool
 	}{
 		{
-			name:      "matching error code",
-			code:      "HYPERFLEET-AUT-001",
-			actual:    makeResp("application/problem+json", `{"type":"https://api.hyperfleet.io/errors/authentication-required","title":"Authentication Required","status":401,"code":"HYPERFLEET-AUT-001"}`),
+			name: "matching error code",
+			code: "HYPERFLEET-AUT-001",
+			actual: makeResp(
+				"application/problem+json",
+				`{"type":"https://api.hyperfleet.io/errors/authentication-required",`+
+					`"title":"Authentication Required","status":401,"code":"HYPERFLEET-AUT-001"}`,
+			),
 			wantMatch: true,
 		},
 		{
-			name:      "mismatched error code",
-			code:      "HYPERFLEET-AUT-001",
-			actual:    makeResp("application/problem+json", `{"type":"https://api.hyperfleet.io/errors/invalid-credentials","title":"Invalid Credentials","status":401,"code":"HYPERFLEET-AUT-002"}`),
+			name:   "malformed content type",
+			code:   "HYPERFLEET-AUT-001",
+			actual: makeResp("application/problem+json; invalid", `{"code":"HYPERFLEET-AUT-001"}`),
+		},
+		{
+			name: "mismatched error code",
+			code: "HYPERFLEET-AUT-001",
+			actual: makeResp(
+				"application/problem+json",
+				`{"type":"https://api.hyperfleet.io/errors/invalid-credentials",`+
+					`"title":"Invalid Credentials","status":401,"code":"HYPERFLEET-AUT-002"}`,
+			),
 			wantMatch: false,
 		},
 		{
@@ -110,9 +123,12 @@ func TestHaveRFC9457Error(t *testing.T) {
 			wantMatch: false,
 		},
 		{
-			name:      "no code field",
-			code:      "HYPERFLEET-AUT-001",
-			actual:    makeResp("application/problem+json", `{"type":"about:blank","title":"Unauthorized","status":401}`),
+			name: "no code field",
+			code: "HYPERFLEET-AUT-001",
+			actual: makeResp(
+				"application/problem+json",
+				`{"type":"about:blank","title":"Unauthorized","status":401}`,
+			),
 			wantMatch: false,
 		},
 		{

@@ -38,8 +38,8 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API read latency by entity size"
 				ginkgo.By("creating a " + size.name + " cluster")
 				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath(size.payload))
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be set")
-				clusterID := *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be set")
+				clusterID := *cluster.ID
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
@@ -48,10 +48,17 @@ var _ = ginkgo.Describe("[Suite: cluster][perf] API read latency by entity size"
 				})
 
 				ginkgo.By("waiting for cluster to reach Reconciled before read")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
-				helper.MeasureMedianLatency("GET /clusters/{id} ("+size.name+" entity)", h.Cfg.APILatencyThreshold(h.Entities.MustGet("Cluster").Thresholds.Read), helper.DefaultSamples,
+				helper.MeasureMedianLatency(
+					"GET /clusters/{id} ("+size.name+" entity)",
+					h.Cfg.APILatencyThreshold(h.Entities.MustGet("Cluster").Thresholds.Read),
+					helper.DefaultSamples,
 					func(int) {
 						_, err := h.Client.GetCluster(ctx, clusterID)
 						Expect(err).NotTo(HaveOccurred())

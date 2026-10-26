@@ -21,7 +21,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/common"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/cliconfig"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 
 	// Import pkg/e2e to register BeforeSuite and SynchronizedAfterSuite hooks.
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	// The ginkgo CLI handles all test-execution flags (--label-filter,
 	// --flake-attempts, --timeout, --junit-report, --procs) directly,
 	// so we only load HyperFleet-specific config here.
-	if err := common.LoadConfig(""); err != nil {
+	if err := cliconfig.LoadConfig(""); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 

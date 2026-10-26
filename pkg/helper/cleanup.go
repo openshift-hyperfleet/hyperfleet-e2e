@@ -9,10 +9,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	"log/slog"
+
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/client/kubernetes"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/helper/helm"
-	"log/slog"
 )
 
 type CleanupHelper struct {
@@ -46,7 +47,12 @@ func NewCleanupHelper() (*CleanupHelper, error) {
 		LabelSelector: labelSelector,
 	}
 
-	return &CleanupHelper{k8sClient: k8sClient, labelSelectorListOptions: labelSelectorListOptions, cfg: cfg, adapterDeploymentList: adapterDeploymentList}, nil
+	return &CleanupHelper{
+		k8sClient:                k8sClient,
+		labelSelectorListOptions: labelSelectorListOptions,
+		cfg:                      cfg,
+		adapterDeploymentList:    adapterDeploymentList,
+	}, nil
 }
 
 // CleanupPubSubResources sweeps Pub/Sub topics and subscriptions created by adapters
@@ -139,7 +145,11 @@ func (c *CleanupHelper) SweepPubsubTestAdapterResources(ctx context.Context) err
 
 // SweepLabeledResources iterates through labeled resources and deletes any orphaned resources
 func (c *CleanupHelper) SweepLabeledResources(ctx context.Context) error {
-	slog.Info("Starting robust test cleanup with label selector:", "labelSelector", c.labelSelectorListOptions.LabelSelector)
+	slog.Info(
+		"Starting robust test cleanup with label selector:",
+		"labelSelector",
+		c.labelSelectorListOptions.LabelSelector,
+	)
 
 	// Phase 1: Delete resources (Background propagation - don't wait for cascade)
 	slog.Info("Phase 1: Best effort to delete resources")
@@ -158,19 +168,25 @@ func (c *CleanupHelper) SweepLabeledResources(ctx context.Context) error {
 
 	// Phase 2: Wait for deletion to complete (poll until resources are gone or timeout)
 	slog.Info("Phase 2: Waiting for deletion to complete (polling for up to 3 minutes)")
-	err := wait.PollUntilContextTimeout(ctx, 1*time.Minute, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
-		remaining, err := c.countRemainingResources(ctx)
-		if err != nil {
-			slog.Error("failed to count remaining resources", "error", err)
+	err := wait.PollUntilContextTimeout(
+		ctx,
+		1*time.Minute,
+		3*time.Minute,
+		true,
+		func(ctx context.Context) (bool, error) {
+			remaining, err := c.countRemainingResources(ctx)
+			if err != nil {
+				slog.Error("failed to count remaining resources", "error", err)
+				return false, nil
+			}
+			if remaining == 0 {
+				slog.Info("all resources deleted successfully")
+				return true, nil
+			}
+			slog.Info("resources still being deleted", "remaining", remaining)
 			return false, nil
-		}
-		if remaining == 0 {
-			slog.Info("all resources deleted successfully")
-			return true, nil
-		}
-		slog.Info("resources still being deleted", "remaining", remaining)
-		return false, nil
-	})
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("not all resources were deleted in time: %w", err)
 	}
@@ -251,8 +267,19 @@ func (c *CleanupHelper) deleteDeployments(ctx context.Context) error {
 	}
 	for _, deployment := range deployments.Items {
 		slog.Warn("deleting Deployment", "name", deployment.Name, "namespace", deployment.Namespace)
-		if err := c.k8sClient.AppsV1().Deployments(deployment.Namespace).Delete(ctx, deployment.Name, metav1.DeleteOptions{}); err != nil {
-			slog.Error("failed to delete Deployment", "name", deployment.Name, "namespace", deployment.Namespace, "error", err)
+		err := c.k8sClient.AppsV1().
+			Deployments(deployment.Namespace).
+			Delete(ctx, deployment.Name, metav1.DeleteOptions{})
+		if err != nil {
+			slog.Error(
+				"failed to delete Deployment",
+				"name",
+				deployment.Name,
+				"namespace",
+				deployment.Namespace,
+				"error",
+				err,
+			)
 		}
 	}
 	return nil
@@ -265,8 +292,17 @@ func (c *CleanupHelper) deleteConfigMaps(ctx context.Context) error {
 	}
 	for _, configMap := range configMaps.Items {
 		slog.Warn("deleting ConfigMap", "name", configMap.Name, "namespace", configMap.Namespace)
-		if err := c.k8sClient.CoreV1().ConfigMaps(configMap.Namespace).Delete(ctx, configMap.Name, metav1.DeleteOptions{}); err != nil {
-			slog.Error("failed to delete ConfigMap", "name", configMap.Name, "namespace", configMap.Namespace, "error", err)
+		err := c.k8sClient.CoreV1().ConfigMaps(configMap.Namespace).Delete(ctx, configMap.Name, metav1.DeleteOptions{})
+		if err != nil {
+			slog.Error(
+				"failed to delete ConfigMap",
+				"name",
+				configMap.Name,
+				"namespace",
+				configMap.Namespace,
+				"error",
+				err,
+			)
 		}
 	}
 	return nil

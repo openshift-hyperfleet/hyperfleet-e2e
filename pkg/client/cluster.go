@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/util"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/pointer"
 
 	"log/slog"
 )
@@ -17,7 +17,7 @@ func (c *HyperFleetClient) CreateCluster(ctx context.Context, req ResourceCreate
 	if err != nil {
 		return nil, fmt.Errorf("create cluster %q: %w", req.Name, err)
 	}
-	slog.Info("cluster created", "cluster_id", util.FromPtr(cluster.Id), "name", req.Name)
+	slog.Info("cluster created", "cluster_id", pointer.FromPtr(cluster.ID), "name", req.Name)
 	return cluster, nil
 }
 
@@ -37,7 +37,11 @@ func (c *HyperFleetClient) ListClustersWithParams(ctx context.Context, params ur
 }
 
 // PatchCluster updates a cluster via PATCH.
-func (c *HyperFleetClient) PatchCluster(ctx context.Context, clusterID string, req ResourcePatchRequest) (*Resource, error) {
+func (c *HyperFleetClient) PatchCluster(
+	ctx context.Context,
+	clusterID string,
+	req ResourcePatchRequest,
+) (*Resource, error) {
 	slog.Info("patching cluster", "cluster_id", clusterID)
 	cluster, err := c.PatchResource(ctx, ClustersPath+"/"+clusterID, req)
 	if err != nil {
@@ -48,7 +52,10 @@ func (c *HyperFleetClient) PatchCluster(ctx context.Context, clusterID string, r
 }
 
 // PatchClusterFromPayload patches a cluster from a JSON payload file.
-func (c *HyperFleetClient) PatchClusterFromPayload(ctx context.Context, clusterID, payloadPath string) (*Resource, error) {
+func (c *HyperFleetClient) PatchClusterFromPayload(
+	ctx context.Context,
+	clusterID, payloadPath string,
+) (*Resource, error) {
 	return c.PatchResourceFromPayload(ctx, ClustersPath+"/"+clusterID, payloadPath)
 }
 

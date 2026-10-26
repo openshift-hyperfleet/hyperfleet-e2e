@@ -24,19 +24,28 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Delete-to-hard-delete latency",
 			h = helper.New()
 
 			var err error
-			clusterID, err = h.CreateTestResource(ctx, h.Entities.MustGet("Cluster"), "", h.TestDataPath("payloads/clusters/cluster-request.json"))
+			clusterID, err = h.CreateTestResource(
+				ctx,
+				h.Entities.MustGet("Cluster"),
+				"",
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+				if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); cleanupErr != nil {
+					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, cleanupErr)
 				}
 			})
 
-			nodepool, err := h.Client.CreateNodePoolFromPayload(ctx, clusterID, h.TestDataPath("payloads/nodepools/nodepool-request.json"))
+			nodepool, err := h.Client.CreateNodePoolFromPayload(
+				ctx,
+				clusterID,
+				h.TestDataPath("payloads/nodepools/nodepool-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodepool.Id).NotTo(BeNil(), "nodepool ID should be set")
-			nodepoolID = *nodepool.Id
+			Expect(nodepool.ID).NotTo(BeNil(), "nodepool ID should be set")
+			nodepoolID = *nodepool.ID
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if err := h.CleanupTestResource(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID); err != nil {
@@ -45,24 +54,35 @@ var _ = ginkgo.Describe("[Suite: nodepool][perf] Delete-to-hard-delete latency",
 			})
 
 			ginkgo.By("waiting for nodepool to reach Reconciled before delete")
-			Eventually(h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+				h.Entities.MustGet("NodePool").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
-		ginkgo.It("should delete a nodepool and reach hard-delete within acceptable latency", func(ctx context.Context) {
-			ginkgo.By("deleting nodepool and timing until hard-delete (404)")
-			start := time.Now()
+		ginkgo.It(
+			"should delete a nodepool and reach hard-delete within acceptable latency",
+			func(ctx context.Context) {
+				ginkgo.By("deleting nodepool and timing until hard-delete (404)")
+				start := time.Now()
 
-			_, err := h.Client.DeleteNodePool(ctx, clusterID, nodepoolID)
-			Expect(err).NotTo(HaveOccurred())
+				_, err := h.Client.DeleteNodePool(ctx, clusterID, nodepoolID)
+				Expect(err).NotTo(HaveOccurred())
 
-			Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID), h.Entities.MustGet("NodePool").Timeouts.Deleted, h.Cfg.Polling.Interval).
-				Should(Equal(http.StatusNotFound))
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("NodePool"), clusterID, nodepoolID),
+					h.Entities.MustGet("NodePool").Timeouts.Deleted,
+					h.Cfg.Polling.Interval,
+				).
+					Should(Equal(http.StatusNotFound))
 
-			elapsed := time.Since(start)
-			ginkgo.GinkgoWriter.Printf("[PERF] NodePool delete-to-hard-delete latency: %v\n", elapsed)
-			Expect(elapsed).To(BeNumerically("<", h.Entities.MustGet("NodePool").Thresholds.Deleted),
-				"nodepool delete-to-hard-delete exceeded threshold")
-		})
+				elapsed := time.Since(start)
+				ginkgo.GinkgoWriter.Printf("[PERF] NodePool delete-to-hard-delete latency: %v\n", elapsed)
+				Expect(elapsed).To(BeNumerically("<", h.Entities.MustGet("NodePool").Thresholds.Deleted),
+					"nodepool delete-to-hard-delete exceeded threshold")
+			},
+		)
 	},
 )

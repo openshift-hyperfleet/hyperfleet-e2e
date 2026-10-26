@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
+
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
@@ -41,8 +43,8 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("Cleanup cloned adapter Helm chart")
-				if err := cleanupAdapterChart(); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup adapter chart: %v\n", err)
+				if cleanupErr := cleanupAdapterChart(); cleanupErr != nil {
+					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup adapter chart: %v\n", cleanupErr)
 				}
 			})
 
@@ -94,14 +96,22 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 				// Register adapter cleanup (executed AFTER API config restore due to LIFO)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Uninstall crash-adapter")
-					if err := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", releaseName, err)
+					if uninstallErr := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); uninstallErr != nil {
+						ginkgo.GinkgoWriter.Printf(
+							"Warning: failed to uninstall adapter %s: %v\n",
+							releaseName,
+							uninstallErr,
+						)
 					}
 
-					if h.Cfg.BrokerType == "googlepubsub" {
+					if h.Cfg.BrokerType == config.BrokerTypeGooglePubSub {
 						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); err != nil {
-							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
+						if deleteErr := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); deleteErr != nil {
+							ginkgo.GinkgoWriter.Printf(
+								"Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n",
+								adapterName,
+								deleteErr,
+							)
 						}
 					}
 				})
@@ -116,12 +126,21 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 				// Register API config restore AFTER adapter cleanup registration (LIFO → executes FIRST)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Restore API required adapters to original config")
-					if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, originalAdapters, 3); err != nil {
-						ginkgo.GinkgoWriter.Printf("CRITICAL: %v\n", err)
+					restoreErr := h.RestoreAPIRequiredAdaptersWithRetry(
+						ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, originalAdapters, 3,
+					)
+					if restoreErr != nil {
+						ginkgo.GinkgoWriter.Printf("CRITICAL: %v\n", restoreErr)
 					}
 				})
 
-				err = h.UpgradeAPIRequiredAdapters(ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, updatedAdapters)
+				err = h.UpgradeAPIRequiredAdapters(
+					ctx,
+					h.Entities.MustGet("Cluster"),
+					apiChartPath,
+					h.Cfg.Namespace,
+					updatedAdapters,
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to upgrade API with crash-adapter in required adapters")
 
 				// Step 1c: Find deployment name and scale down to simulate crash
@@ -134,16 +153,19 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Cluster Can Reach Correct St
 
 				// Step 2: Create cluster while crash-adapter is down
 				ginkgo.By("Submit an API request to create a Cluster resource")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
-				clusterID := *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be generated")
+				clusterID := *cluster.ID
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Cleanup test cluster " + clusterID)
-					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); cleanupErr != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, cleanupErr)
 					}
 				})
 

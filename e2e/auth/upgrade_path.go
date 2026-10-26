@@ -49,10 +49,13 @@ var _ = ginkgo.Describe("[Suite: auth][upgrade] Authentication Upgrade Path Vali
 				}
 
 				ginkgo.By("2. Verifying machine identity: creating cluster and checking created_by")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "authenticated cluster creation should succeed")
-				Expect(cluster.Id).NotTo(BeNil())
-				clusterID := *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil())
+				clusterID := *cluster.ID
 
 				h.DeferCleanup(h.Entities.MustGet("Cluster"), "", clusterID)
 
@@ -60,7 +63,11 @@ var _ = ginkgo.Describe("[Suite: auth][upgrade] Authentication Upgrade Path Vali
 					"the selected authentication mode should preserve the ServiceAccount identity")
 
 				ginkgo.By("3. Verifying Sentinel auth: cluster reaches Reconciled")
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue),
 						"Sentinel must authenticate to API and publish events for cluster to reach Reconciled")
 

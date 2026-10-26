@@ -41,7 +41,9 @@ func TestEnvVarReachesEveryField(t *testing.T) {
 
 	for round := range 20 {
 		viper.Reset()
-		BindEnvVars()
+		if err := BindEnvVars(); err != nil {
+			t.Fatalf("BindEnvVars: %v", err)
+		}
 		var cfg Config
 		if err := viper.Unmarshal(&cfg); err != nil {
 			t.Fatalf("Unmarshal: %v", err)

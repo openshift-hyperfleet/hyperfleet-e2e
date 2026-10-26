@@ -1,4 +1,4 @@
-package util
+package pointer
 
 import "testing"
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/common"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/cliconfig"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/cmd/hyperfleet-e2e/test"
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
 )
@@ -19,7 +19,7 @@ var root = &cobra.Command{
 	SilenceUsage:  true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Set config file in common package for access by subcommands
-		common.ConfigFile = configFile
+		cliconfig.ConfigFile = configFile
 	},
 }
 

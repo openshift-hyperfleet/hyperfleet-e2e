@@ -15,7 +15,8 @@ import (
 
 const concurrentClusterCount = 5
 
-var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurrent cluster creations without resource conflicts",
+var _ = ginkgo.Describe(
+	"[Suite: cluster][concurrent] System can process concurrent cluster creations without resource conflicts",
 	ginkgo.Label(labels.Tier1),
 	func() {
 		var h *helper.Helper
@@ -31,9 +32,9 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				ginkgo.By(fmt.Sprintf("Submit %d cluster creation requests simultaneously", concurrentClusterCount))
 
 				type clusterResult struct {
+					err  error
 					id   string
 					name string
-					err  error
 				}
 
 				results := make([]clusterResult, concurrentClusterCount)
@@ -45,17 +46,20 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 						defer wg.Done()
 						defer ginkgo.GinkgoRecover()
 
-						cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+						cluster, err := h.Client.CreateClusterFromPayload(
+							ctx,
+							h.TestDataPath("payloads/clusters/cluster-request.json"),
+						)
 						if err != nil {
 							results[idx] = clusterResult{err: fmt.Errorf("failed to create cluster %d: %w", idx, err)}
 							return
 						}
-						if cluster.Id == nil {
+						if cluster.ID == nil {
 							results[idx] = clusterResult{err: fmt.Errorf("cluster %d has nil ID", idx)}
 							return
 						}
 						results[idx] = clusterResult{
-							id:   *cluster.Id,
+							id:   *cluster.ID,
 							name: cluster.Name,
 						}
 					}(i)
@@ -93,7 +97,11 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				ginkgo.By("Wait for all clusters to reach Reconciled=True and Available=True")
 				for i, clusterID := range clusterIDs {
 					ginkgo.GinkgoWriter.Printf("Waiting for cluster %d (%s) to become Reconciled...\n", i, clusterID)
-					Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+					Eventually(
+						h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+						h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+						h.Cfg.Polling.Interval,
+					).
 						Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 					cluster, err := h.Client.GetCluster(ctx, clusterID)
@@ -104,7 +112,11 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 					Expect(hasAvailable).To(BeTrue(),
 						"cluster %d (%s) should have LastKnownReconciled=True", i, clusterID)
 
-					ginkgo.GinkgoWriter.Printf("Cluster %d (%s) reached Reconciled=True, Available=True\n", i, clusterID)
+					ginkgo.GinkgoWriter.Printf(
+						"Cluster %d (%s) reached Reconciled=True, Available=True\n",
+						i,
+						clusterID,
+					)
 				}
 
 				ginkgo.By("Verify each cluster has isolated Kubernetes resources (separate namespaces)")
@@ -122,8 +134,10 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 				for i, clusterID := range clusterIDs {
 					Eventually(func(g Gomega) {
 						statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
-						g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses for cluster %d (%s)", i, clusterID)
-						g.Expect(statuses.Items).NotTo(BeEmpty(), "cluster %d (%s) should have adapter statuses", i, clusterID)
+						g.Expect(err).
+							NotTo(HaveOccurred(), "failed to get cluster statuses for cluster %d (%s)", i, clusterID)
+						g.Expect(statuses.Items).
+							NotTo(BeEmpty(), "cluster %d (%s) should have adapter statuses", i, clusterID)
 
 						// Build adapter status map
 						adapterMap := make(map[string]client.AdapterStatus)
@@ -154,7 +168,10 @@ var _ = ginkgo.Describe("[Suite: cluster][concurrent] System can process concurr
 					ginkgo.GinkgoWriter.Printf("Cluster %d (%s) has all adapter statuses complete\n", i, clusterID)
 				}
 
-				ginkgo.GinkgoWriter.Printf("Successfully validated %d concurrent cluster creations with resource isolation\n", concurrentClusterCount)
+				ginkgo.GinkgoWriter.Printf(
+					"Successfully validated %d concurrent cluster creations with resource isolation\n",
+					concurrentClusterCount,
+				)
 			})
 
 	},

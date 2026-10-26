@@ -23,14 +23,20 @@ var _ = ginkgo.Describe("[Suite: wifconfig][perf] Delete latency",
 		ginkgo.It("should delete a wifconfig within acceptable latency", func(ctx context.Context) {
 			wifConfigIDs := make([]string, helper.DefaultSamples)
 			for i := range wifConfigIDs {
-				wifConfig, err := h.Client.CreateWifConfigFromPayload(ctx, h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"))
+				wifConfig, err := h.Client.CreateWifConfigFromPayload(
+					ctx,
+					h.TestDataPath("payloads/wifconfigs/wifconfig-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(wifConfig.Id).NotTo(BeNil(), "wifconfig ID should be set")
-				wifConfigIDs[i] = *wifConfig.Id
-				h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.Id)
+				Expect(wifConfig.ID).NotTo(BeNil(), "wifconfig ID should be set")
+				wifConfigIDs[i] = *wifConfig.ID
+				h.DeferCleanup(h.Entities.MustGet("WifConfig"), "", *wifConfig.ID)
 			}
 
-			helper.MeasureMedianLatency("DELETE /wifconfigs/{id}", h.Cfg.APILatencyThreshold(h.Entities.MustGet("WifConfig").Thresholds.Delete), len(wifConfigIDs),
+			helper.MeasureMedianLatency(
+				"DELETE /wifconfigs/{id}",
+				h.Cfg.APILatencyThreshold(h.Entities.MustGet("WifConfig").Thresholds.Delete),
+				len(wifConfigIDs),
 				func(i int) {
 					deleted, err := h.Client.DeleteWifConfig(ctx, wifConfigIDs[i])
 					Expect(err).NotTo(HaveOccurred())

@@ -21,55 +21,70 @@ var _ = ginkgo.Describe("[Suite: cluster][update] Rapid Update Coalescing",
 			h = helper.New()
 
 			ginkgo.By("creating cluster and waiting for Reconciled at generation 1")
-			cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+			cluster, err := h.Client.CreateClusterFromPayload(
+				ctx,
+				h.TestDataPath("payloads/clusters/cluster-request.json"),
+			)
 			Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-			Expect(cluster.Id).NotTo(BeNil())
-			clusterID = *cluster.Id
+			Expect(cluster.ID).NotTo(BeNil())
+			clusterID = *cluster.ID
 
-			Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+			Eventually(
+				h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+				h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+				h.Cfg.Polling.Interval,
+			).
 				Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 		})
 
-		ginkgo.It("should coalesce multiple rapid updates and reconcile to the latest generation", func(ctx context.Context) {
-			ginkgo.By("sending three PATCH requests in rapid succession")
-			patch1, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
-				Spec: map[string]any{"update": "first"},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(patch1.Generation).To(Equal(int32(2)))
+		ginkgo.It(
+			"should coalesce multiple rapid updates and reconcile to the latest generation",
+			func(ctx context.Context) {
+				ginkgo.By("sending three PATCH requests in rapid succession")
+				patch1, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
+					Spec: map[string]any{"update": "first"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(patch1.Generation).To(Equal(int32(2)))
 
-			patch2, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
-				Spec: map[string]any{"update": "second"},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(patch2.Generation).To(Equal(int32(3)))
+				patch2, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
+					Spec: map[string]any{"update": "second"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(patch2.Generation).To(Equal(int32(3)))
 
-			patch3, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
-				Spec: map[string]any{"update": "third"},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(patch3.Generation).To(Equal(int32(4)))
+				patch3, err := h.Client.PatchCluster(ctx, clusterID, client.ResourcePatchRequest{
+					Spec: map[string]any{"update": "third"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(patch3.Generation).To(Equal(int32(4)))
 
-			ginkgo.By("waiting for all adapters to reconcile at the final generation")
-			Eventually(h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
-				Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("Cluster").RequiredAdapters, int32(4)))
+				ginkgo.By("waiting for all adapters to reconcile at the final generation")
+				Eventually(
+					h.PollAdapterStatuses(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
+					Should(helper.HaveAllAdaptersAtGeneration(h.Entities.MustGet("Cluster").RequiredAdapters, int32(4)))
 
-			ginkgo.By("verifying cluster reaches Reconciled=True at final generation")
-			Eventually(func(g Gomega) {
-				finalCluster, err := h.Client.GetCluster(ctx, clusterID)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(finalCluster.Generation).To(Equal(int32(4)))
+				ginkgo.By("verifying cluster reaches Reconciled=True at final generation")
+				Eventually(func(g Gomega) {
+					finalCluster, err := h.Client.GetCluster(ctx, clusterID)
+					g.Expect(err).NotTo(HaveOccurred())
+					g.Expect(finalCluster.Generation).To(Equal(int32(4)))
 
-				found := false
-				for _, cond := range finalCluster.Status.Conditions {
-					if cond.Type == client.ConditionTypeReconciled && cond.Status == client.ResourceConditionStatusTrue {
-						found = true
-						g.Expect(cond.ObservedGeneration).To(Equal(int32(4)))
+					found := false
+					for _, cond := range finalCluster.Status.Conditions {
+						if cond.Type == client.ConditionTypeReconciled &&
+							cond.Status == client.ResourceConditionStatusTrue {
+							found = true
+							g.Expect(cond.ObservedGeneration).To(Equal(int32(4)))
+						}
 					}
-				}
-				g.Expect(found).To(BeTrue(), "cluster should have Reconciled=True")
-			}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
-		})
+					g.Expect(found).To(BeTrue(), "cluster should have Reconciled=True")
+				}, h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).Should(Succeed())
+			},
+		)
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if h == nil || clusterID == "" {

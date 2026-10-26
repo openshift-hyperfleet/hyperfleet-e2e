@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/config"
+
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega" //nolint:staticcheck // dot import for test readability
 
@@ -42,8 +44,8 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("Cleanup cloned adapter Helm chart")
-				if err := cleanupAdapterChart(); err != nil {
-					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup adapter chart: %v\n", err)
+				if cleanupErr := cleanupAdapterChart(); cleanupErr != nil {
+					ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup adapter chart: %v\n", cleanupErr)
 				}
 			})
 
@@ -92,13 +94,21 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 				err = h.DeployAdapter(ctx, deployOpts)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Uninstall stuck-adapter")
-					if err := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to uninstall adapter %s: %v\n", releaseName, err)
+					if uninstallErr := h.UninstallAdapter(ctx, releaseName, h.Cfg.Namespace); uninstallErr != nil {
+						ginkgo.GinkgoWriter.Printf(
+							"Warning: failed to uninstall adapter %s: %v\n",
+							releaseName,
+							uninstallErr,
+						)
 					}
-					if h.Cfg.BrokerType == "googlepubsub" {
+					if h.Cfg.BrokerType == config.BrokerTypeGooglePubSub {
 						ginkgo.By("Clean up Pub/Sub subscription and dlq topic for adapter")
-						if err := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); err != nil {
-							ginkgo.GinkgoWriter.Printf("Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n", adapterName, err)
+						if deleteErr := h.DeletePubSubResourcesForAdapter(ctx, deployOpts.Entity, adapterName); deleteErr != nil {
+							ginkgo.GinkgoWriter.Printf(
+								"Warning: failed to delete Pub/Sub subscription and dlq topic for adapter %s: %v\n",
+								adapterName,
+								deleteErr,
+							)
 						}
 					}
 				})
@@ -112,38 +122,54 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 				// Register API config restore AFTER adapter cleanup registration (LIFO → executes FIRST)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Restore API required adapters to original config")
-					if err := h.RestoreAPIRequiredAdaptersWithRetry(ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, originalAdapters, 3); err != nil {
-						ginkgo.GinkgoWriter.Printf("CRITICAL: %v\n", err)
+					restoreErr := h.RestoreAPIRequiredAdaptersWithRetry(
+						ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, originalAdapters, 3,
+					)
+					if restoreErr != nil {
+						ginkgo.GinkgoWriter.Printf("CRITICAL: %v\n", restoreErr)
 					}
 				})
 
-				err = h.UpgradeAPIRequiredAdapters(ctx, h.Entities.MustGet("Cluster"), apiChartPath, h.Cfg.Namespace, updatedAdapters)
+				err = h.UpgradeAPIRequiredAdapters(
+					ctx,
+					h.Entities.MustGet("Cluster"),
+					apiChartPath,
+					h.Cfg.Namespace,
+					updatedAdapters,
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to upgrade API with stuck-adapter in required adapters")
 
 				deploymentName, err := h.GetDeploymentName(ctx, h.Cfg.Namespace, releaseName)
 				Expect(err).NotTo(HaveOccurred(), "failed to find stuck-adapter deployment name")
 
 				ginkgo.By("Create cluster and wait for Reconciled with all adapters including stuck-adapter")
-				cluster, err := h.Client.CreateClusterFromPayload(ctx, h.TestDataPath("payloads/clusters/cluster-request.json"))
+				cluster, err := h.Client.CreateClusterFromPayload(
+					ctx,
+					h.TestDataPath("payloads/clusters/cluster-request.json"),
+				)
 				Expect(err).NotTo(HaveOccurred(), "failed to create cluster")
-				Expect(cluster.Id).NotTo(BeNil(), "cluster ID should be generated")
-				clusterID := *cluster.Id
+				Expect(cluster.ID).NotTo(BeNil(), "cluster ID should be generated")
+				clusterID := *cluster.ID
 				ginkgo.GinkgoWriter.Printf("Created cluster ID: %s, Name: %s\n", clusterID, cluster.Name)
 
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("Cleanup test cluster " + clusterID)
-					if err := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); err != nil {
-						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, err)
+					if cleanupErr := h.CleanupTestResource(ctx, h.Entities.MustGet("Cluster"), "", clusterID); cleanupErr != nil {
+						ginkgo.GinkgoWriter.Printf("Warning: failed to cleanup cluster %s: %v\n", clusterID, cleanupErr)
 					}
 				})
 
-				Eventually(h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Reconciled, h.Cfg.Polling.Interval).
+				Eventually(
+					h.Poll(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Reconciled,
+					h.Cfg.Polling.Interval,
+				).
 					Should(helper.HaveResourceCondition(client.ConditionTypeReconciled, client.ResourceConditionStatusTrue))
 
 				ginkgo.By("Verify stuck-adapter reported Applied=True")
 				Eventually(func(g Gomega) {
-					statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
+					statuses, statusesErr := h.Client.GetClusterStatuses(ctx, clusterID)
+					g.Expect(statusesErr).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
 					var found bool
 					for _, s := range statuses.Items {
@@ -169,8 +195,8 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 
 				ginkgo.By("Wait for healthy adapters to report Finalized=True")
 				Eventually(func(g Gomega) {
-					statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
+					statuses, statusesErr := h.Client.GetClusterStatuses(ctx, clusterID)
+					g.Expect(statusesErr).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
 					adapterMap := make(map[string]client.AdapterStatus, len(statuses.Items))
 					for _, s := range statuses.Items {
@@ -188,16 +214,16 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 
 				ginkgo.By("Verify cluster remains stuck in soft-deleted state (not hard-deleted)")
 				Consistently(func(g Gomega) {
-					cl, err := h.Client.GetCluster(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred(), "cluster should still be accessible (not hard-deleted)")
+					cl, getErr := h.Client.GetCluster(ctx, clusterID)
+					g.Expect(getErr).NotTo(HaveOccurred(), "cluster should still be accessible (not hard-deleted)")
 					g.Expect(cl.DeletedTime).NotTo(BeNil(), "cluster should still be soft-deleted")
 
 					g.Expect(h.HasResourceCondition(cl.Status.Conditions,
 						client.ConditionTypeReconciled, client.ResourceConditionStatusFalse)).To(BeTrue(),
 						"cluster Reconciled should remain False while stuck-adapter is unavailable")
 
-					statuses, err := h.Client.GetClusterStatuses(ctx, clusterID)
-					g.Expect(err).NotTo(HaveOccurred(), "failed to get cluster statuses")
+					statuses, statusesErr := h.Client.GetClusterStatuses(ctx, clusterID)
+					g.Expect(statusesErr).NotTo(HaveOccurred(), "failed to get cluster statuses")
 
 					for _, s := range statuses.Items {
 						if s.Adapter == adapterName {
@@ -209,18 +235,28 @@ var _ = ginkgo.Describe("[Suite: cluster][negative] Stuck Deletion -- Adapter Un
 					}
 				}, h.Cfg.Timeouts.Adapter.Processing/2, h.Cfg.Polling.Interval).Should(Succeed())
 
-				ginkgo.GinkgoWriter.Printf("Verified: cluster stuck in soft-deleted state, healthy adapters finalized but stuck-adapter has not\n")
+				ginkgo.GinkgoWriter.Printf(
+					"Verified: cluster stuck in soft-deleted state, healthy adapters finalized but stuck-adapter has not\n",
+				)
 
 				ginkgo.By("Restore stuck-adapter by scaling up")
 				err = h.ScaleDeployment(ctx, h.Cfg.Namespace, deploymentName, 1)
 				Expect(err).NotTo(HaveOccurred(), "failed to scale up stuck-adapter")
 
 				ginkgo.By("Verify cluster is hard-deleted after stuck-adapter recovery")
-				Eventually(h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID), h.Entities.MustGet("Cluster").Timeouts.Deleted, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollHTTPStatus(ctx, h.Entities.MustGet("Cluster"), "", clusterID),
+					h.Entities.MustGet("Cluster").Timeouts.Deleted,
+					h.Cfg.Polling.Interval,
+				).
 					Should(Equal(http.StatusNotFound))
 
 				ginkgo.By("Verify downstream K8s cl-stuck-<clusterID> namespace is cleaned up")
-				Eventually(h.PollNamespacesByPrefix(ctx, fmt.Sprintf("%s-%s", adapterName, clusterID)), h.Cfg.Timeouts.Adapter.Processing, h.Cfg.Polling.Interval).
+				Eventually(
+					h.PollNamespacesByPrefix(ctx, fmt.Sprintf("%s-%s", adapterName, clusterID)),
+					h.Cfg.Timeouts.Adapter.Processing,
+					h.Cfg.Polling.Interval,
+				).
 					Should(BeEmpty())
 
 				ginkgo.GinkgoWriter.Printf("Verified: stuck-adapter recovered, cluster hard-deleted\n")

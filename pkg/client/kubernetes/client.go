@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -88,16 +89,29 @@ func (c *Client) DeleteNamespaceAndWait(ctx context.Context, namespace string) e
 	}
 
 	// Delete deployments
-	_ = c.AppsV1().Deployments(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	// These deletions only accelerate cleanup. Continue to delete the namespace if they fail.
+	deleteErr := c.AppsV1().Deployments(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	if deleteErr != nil {
+		slog.Warn("failed to delete deployments before namespace cleanup", "namespace", namespace, "error", deleteErr)
+	}
 
 	// Delete jobs
-	_ = c.BatchV1().Jobs(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	deleteErr = c.BatchV1().Jobs(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	if deleteErr != nil {
+		slog.Warn("failed to delete jobs before namespace cleanup", "namespace", namespace, "error", deleteErr)
+	}
 
 	// Delete configmaps
-	_ = c.CoreV1().ConfigMaps(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	deleteErr = c.CoreV1().ConfigMaps(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	if deleteErr != nil {
+		slog.Warn("failed to delete configmaps before namespace cleanup", "namespace", namespace, "error", deleteErr)
+	}
 
 	// Delete pods
-	_ = c.CoreV1().Pods(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	deleteErr = c.CoreV1().Pods(namespace).DeleteCollection(ctx, deleteOpts, metav1.ListOptions{})
+	if deleteErr != nil {
+		slog.Warn("failed to delete pods before namespace cleanup", "namespace", namespace, "error", deleteErr)
+	}
 
 	// Delete namespace with foreground propagation to ensure resources are cleaned up
 	nsDeleteOpts := metav1.DeleteOptions{
@@ -117,12 +131,12 @@ func (c *Client) DeleteNamespaceAndWait(ctx context.Context, namespace string) e
 		Cap:      15 * time.Second, // Increased cap for better handling of stuck resources
 	}
 	err = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		_, err := c.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
+		_, getErr := c.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		if apierrors.IsNotFound(getErr) {
 			return true, nil // Namespace fully deleted
 		}
-		if err != nil {
-			return false, err // Unexpected error
+		if getErr != nil {
+			return false, getErr // Unexpected error
 		}
 		return false, nil // Still exists, keep polling
 	})
@@ -175,7 +189,11 @@ func (c *Client) FetchConfigMap(ctx context.Context, namespace, name string) (*c
 }
 
 // FetchJobsByLabels lists jobs matching label selector in namespace
-func (c *Client) FetchJobsByLabels(ctx context.Context, namespace string, labelMap map[string]string) ([]batchv1.Job, error) {
+func (c *Client) FetchJobsByLabels(
+	ctx context.Context,
+	namespace string,
+	labelMap map[string]string,
+) ([]batchv1.Job, error) {
 	labelSelector := labels.SelectorFromSet(labelMap).String()
 	jobs, err := c.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -188,7 +206,11 @@ func (c *Client) FetchJobsByLabels(ctx context.Context, namespace string, labelM
 }
 
 // FetchDeploymentsByLabels lists deployments matching label selector in namespace
-func (c *Client) FetchDeploymentsByLabels(ctx context.Context, namespace string, labelMap map[string]string) ([]appsv1.Deployment, error) {
+func (c *Client) FetchDeploymentsByLabels(
+	ctx context.Context,
+	namespace string,
+	labelMap map[string]string,
+) ([]appsv1.Deployment, error) {
 	labelSelector := labels.SelectorFromSet(labelMap).String()
 	deployments, err := c.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -201,7 +223,11 @@ func (c *Client) FetchDeploymentsByLabels(ctx context.Context, namespace string,
 }
 
 // FetchConfigMapsByLabels lists configmaps matching label selector in namespace
-func (c *Client) FetchConfigMapsByLabels(ctx context.Context, namespace string, labelMap map[string]string) ([]corev1.ConfigMap, error) {
+func (c *Client) FetchConfigMapsByLabels(
+	ctx context.Context,
+	namespace string,
+	labelMap map[string]string,
+) ([]corev1.ConfigMap, error) {
 	labelSelector := labels.SelectorFromSet(labelMap).String()
 	configmaps, err := c.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -215,7 +241,11 @@ func (c *Client) FetchConfigMapsByLabels(ctx context.Context, namespace string, 
 
 // GetUniqueJobByLabels fetches exactly one job matching labels in namespace.
 // Returns error if zero or multiple jobs are found.
-func (c *Client) GetUniqueJobByLabels(ctx context.Context, namespace string, labelMap map[string]string) (*batchv1.Job, error) {
+func (c *Client) GetUniqueJobByLabels(
+	ctx context.Context,
+	namespace string,
+	labelMap map[string]string,
+) (*batchv1.Job, error) {
 	jobs, err := c.FetchJobsByLabels(ctx, namespace, labelMap)
 	if err != nil {
 		return nil, err
@@ -236,7 +266,11 @@ func (c *Client) GetUniqueJobByLabels(ctx context.Context, namespace string, lab
 
 // GetUniqueDeploymentByLabels fetches exactly one deployment matching labels in namespace.
 // Returns error if zero or multiple deployments are found.
-func (c *Client) GetUniqueDeploymentByLabels(ctx context.Context, namespace string, labelMap map[string]string) (*appsv1.Deployment, error) {
+func (c *Client) GetUniqueDeploymentByLabels(
+	ctx context.Context,
+	namespace string,
+	labelMap map[string]string,
+) (*appsv1.Deployment, error) {
 	deployments, err := c.FetchDeploymentsByLabels(ctx, namespace, labelMap)
 	if err != nil {
 		return nil, err
@@ -248,8 +282,12 @@ func (c *Client) GetUniqueDeploymentByLabels(ctx context.Context, namespace stri
 		return nil, fmt.Errorf("no deployment found in namespace %s with selector %s", namespace, labelSelector)
 	}
 	if len(deployments) > 1 {
-		return nil, fmt.Errorf("multiple deployments (%d) found in namespace %s with selector %s - expected exactly one",
-			len(deployments), namespace, labelSelector)
+		return nil, fmt.Errorf(
+			"multiple deployments (%d) found in namespace %s with selector %s - expected exactly one",
+			len(deployments),
+			namespace,
+			labelSelector,
+		)
 	}
 
 	return &deployments[0], nil
@@ -257,7 +295,11 @@ func (c *Client) GetUniqueDeploymentByLabels(ctx context.Context, namespace stri
 
 // GetUniqueConfigMapByLabels fetches exactly one configmap matching labels in namespace.
 // Returns error if zero or multiple configmaps are found.
-func (c *Client) GetUniqueConfigMapByLabels(ctx context.Context, namespace string, labelMap map[string]string) (*corev1.ConfigMap, error) {
+func (c *Client) GetUniqueConfigMapByLabels(
+	ctx context.Context,
+	namespace string,
+	labelMap map[string]string,
+) (*corev1.ConfigMap, error) {
 	configmaps, err := c.FetchConfigMapsByLabels(ctx, namespace, labelMap)
 	if err != nil {
 		return nil, err
@@ -368,7 +410,11 @@ func (c *Client) ScaleDeploymentBySelector(ctx context.Context, namespace, selec
 }
 
 // HasDeploymentCondition checks if deployment has the specified condition with expected status
-func HasDeploymentCondition(deploy *appsv1.Deployment, condType appsv1.DeploymentConditionType, status corev1.ConditionStatus) bool {
+func HasDeploymentCondition(
+	deploy *appsv1.Deployment,
+	condType appsv1.DeploymentConditionType,
+	status corev1.ConditionStatus,
+) bool {
 	for _, cond := range deploy.Status.Conditions {
 		if cond.Type == condType && cond.Status == status {
 			return true
@@ -403,7 +449,11 @@ func (c *Client) DeleteServiceAccount(ctx context.Context, namespace, name strin
 }
 
 // CreateToken requests a token for a service account using the TokenRequest API
-func (c *Client) CreateToken(ctx context.Context, namespace, serviceAccountName, audience string, expirationSeconds int64) (string, error) {
+func (c *Client) CreateToken(
+	ctx context.Context,
+	namespace, serviceAccountName, audience string,
+	expirationSeconds int64,
+) (string, error) {
 	tokenRequest := &authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
 			Audiences:         []string{audience},
@@ -411,9 +461,16 @@ func (c *Client) CreateToken(ctx context.Context, namespace, serviceAccountName,
 		},
 	}
 
-	tokenResp, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, serviceAccountName, tokenRequest, metav1.CreateOptions{})
+	tokenResp, err := c.CoreV1().
+		ServiceAccounts(namespace).
+		CreateToken(ctx, serviceAccountName, tokenRequest, metav1.CreateOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to create token for service account %s/%s: %w", namespace, serviceAccountName, err)
+		return "", fmt.Errorf(
+			"failed to create token for service account %s/%s: %w",
+			namespace,
+			serviceAccountName,
+			err,
+		)
 	}
 
 	return tokenResp.Status.Token, nil

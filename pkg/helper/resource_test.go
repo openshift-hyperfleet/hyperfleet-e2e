@@ -59,7 +59,8 @@ func TestDescriptorPollers(t *testing.T) {
 				if calls == 2 {
 					wantPath += "/statuses"
 				}
-				if r.Method != http.MethodGet || r.URL.Path != wantPath || r.Header.Get("Authorization") != "Bearer test-token" {
+				if r.Method != http.MethodGet || r.URL.Path != wantPath ||
+					r.Header.Get("Authorization") != "Bearer test-token" {
 					t.Errorf("unexpected request: %s %s, auth=%q", r.Method, r.URL.Path, r.Header.Get("Authorization"))
 				}
 				switch calls {
@@ -76,7 +77,7 @@ func TestDescriptorPollers(t *testing.T) {
 				e = h.Entities.MustGet(tc.kind)
 			}
 			resource, err := h.Poll(t.Context(), e, tc.parent, "id")()
-			if err != nil || resource == nil || resource.Id == nil || *resource.Id != "id" {
+			if err != nil || resource == nil || resource.ID == nil || *resource.ID != "id" {
 				t.Fatalf("resource=%+v, err=%v", resource, err)
 			}
 			statuses, err := h.PollAdapterStatuses(t.Context(), e, tc.parent, "id")()
@@ -122,7 +123,10 @@ func TestPollersPassMissingParentToAPI(t *testing.T) {
 
 func TestPollersPropagateErrors(t *testing.T) {
 	t.Parallel()
-	h := newResourceTestHelper(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) })
+	h := newResourceTestHelper(
+		t,
+		func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) },
+	)
 	e := h.Entities.MustGet("Cluster")
 	if _, err := h.Poll(t.Context(), e, "", "id")(); !isHTTPStatus(err, http.StatusUnauthorized) {
 		t.Fatalf("lost HTTP error: %v", err)
@@ -150,7 +154,8 @@ func TestCreateTestResource(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := filepath.Join(t.TempDir(), "payload.json")
-			if err := os.WriteFile(payload, fmt.Appendf(nil, `{"kind":%q,"name":"test-{{.Random}}","spec":{}}`, tc.kind), 0600); err != nil {
+			data := fmt.Appendf(nil, `{"kind":%q,"name":"test-{{.Random}}","spec":{}}`, tc.kind)
+			if err := os.WriteFile(payload, data, 0600); err != nil {
 				t.Fatal(err)
 			}
 			h := newResourceTestHelper(t, func(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +163,9 @@ func TestCreateTestResource(t *testing.T) {
 					t.Errorf("unexpected create: %s %s", r.Method, r.URL.Path)
 				}
 				var body client.ResourceCreateRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Kind != tc.kind || !strings.HasPrefix(body.Name, "test-") || strings.Contains(body.Name, "{{") {
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Kind != tc.kind ||
+					!strings.HasPrefix(body.Name, "test-") ||
+					strings.Contains(body.Name, "{{") {
 					t.Errorf("payload was not rendered: %+v, %v", body, err)
 				}
 				w.WriteHeader(http.StatusCreated)
@@ -234,7 +241,12 @@ func TestCleanupHardDeletion(t *testing.T) {
 				}
 				w.WriteHeader(tc.pollStatus)
 			})
-			e := descriptor.EntityDescriptor{Kind: "Widget", Plural: "widgets", Cleanup: descriptor.CleanupPolicy{WaitForHardDelete: true}, Timeouts: descriptor.EntityTimeouts{Deleted: 100 * time.Millisecond}}
+			e := descriptor.EntityDescriptor{
+				Kind:     "Widget",
+				Plural:   "widgets",
+				Cleanup:  descriptor.CleanupPolicy{WaitForHardDelete: true},
+				Timeouts: descriptor.EntityTimeouts{Deleted: 100 * time.Millisecond},
+			}
 			err := h.CleanupTestResource(t.Context(), e, "", "id")
 			if (err != nil) != tc.wantErr || polls < 2 {
 				t.Fatalf("polls=%d, err=%v", polls, err)
@@ -355,7 +367,11 @@ func TestCleanupUsesCallerContextForRequests(t *testing.T) {
 					}
 					status = http.StatusNotFound
 				}
-				return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+				return &http.Response{
+					StatusCode: status,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
+				}, nil
 			})}
 			cl, err := client.NewHyperFleetClient("http://test.invalid", httpClient)
 			if err != nil {
@@ -363,7 +379,9 @@ func TestCleanupUsesCallerContextForRequests(t *testing.T) {
 			}
 			h := &Helper{Cfg: &config.Config{}, Client: cl}
 			e := descriptor.EntityDescriptor{Kind: "Widget", Plural: "widgets",
-				Timeouts: descriptor.EntityTimeouts{Deleted: time.Second}, Cleanup: descriptor.CleanupPolicy{WaitForHardDelete: true}}
+				Timeouts: descriptor.EntityTimeouts{
+					Deleted: time.Second,
+				}, Cleanup: descriptor.CleanupPolicy{WaitForHardDelete: true}}
 			err = h.CleanupTestResource(ctx, e, "", "id")
 			if cancelOnPoll {
 				if !errors.Is(err, context.Canceled) {
@@ -382,17 +400,25 @@ func TestCleanupUsesCallerContextForRequests(t *testing.T) {
 func TestCleanupChildrenCompatibility(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name                                  string
-		listStatus, childStatus, parentStatus int
-		wantErr                               string
+		name         string
+		wantErr      string
+		listStatus   int
+		childStatus  int
+		parentStatus int
 	}{
-		{"success", 200, 202, 202, ""},
-		{"child already deleted", 200, 404, 202, ""},
-		{"parent gone during list", 404, 202, 202, ""},
-		{"list failure", 500, 202, 202, "list Version"},
-		{"child failure retained", 200, 500, 202, "delete Version first"},
-		{"child failure retained when parent gone", 200, 500, 404, "delete Version first"},
-		{"parent failure wins", 200, 500, 409, "delete Channel parent"},
+		{name: "success", listStatus: 200, childStatus: 202, parentStatus: 202},
+		{name: "child already deleted", listStatus: 200, childStatus: 404, parentStatus: 202},
+		{name: "parent gone during list", listStatus: 404, childStatus: 202, parentStatus: 202},
+		{name: "list failure", listStatus: 500, childStatus: 202, parentStatus: 202, wantErr: "list Version"},
+		{
+			name: "child failure retained", listStatus: 200, childStatus: 500, parentStatus: 202,
+			wantErr: "delete Version first",
+		},
+		{
+			name: "child failure retained when parent gone", listStatus: 200, childStatus: 500, parentStatus: 404,
+			wantErr: "delete Version first",
+		},
+		{name: "parent failure wins", listStatus: 200, childStatus: 500, parentStatus: 409, wantErr: "delete Channel parent"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
@@ -402,7 +428,10 @@ func TestCleanupChildrenCompatibility(t *testing.T) {
 				switch {
 				case r.Method == http.MethodGet:
 					w.WriteHeader(tc.listStatus)
-					_, _ = fmt.Fprint(w, `{"items":[{"id":"first"},{"id":"second"},{"id":"gone","deleted_time":"2026-01-01T00:00:00Z"},{}]}`)
+					_, _ = fmt.Fprint(
+						w,
+						`{"items":[{"id":"first"},{"id":"second"},{"id":"gone","deleted_time":"2026-01-01T00:00:00Z"},{}]}`,
+					)
 				case path == "channels/parent":
 					w.WriteHeader(tc.parentStatus)
 					_, _ = fmt.Fprint(w, `{}`)
@@ -412,12 +441,18 @@ func TestCleanupChildrenCompatibility(t *testing.T) {
 				}
 			})
 			err := h.CleanupTestResource(t.Context(), h.Entities.MustGet("Channel"), "", "parent")
-			if tc.wantErr == "" && err != nil || tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)) {
+			if tc.wantErr == "" && err != nil ||
+				tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)) {
 				t.Fatalf("err=%v, want=%q", err, tc.wantErr)
 			}
 			want := []string{"GET channels/parent/versions"}
 			if tc.listStatus == 200 {
-				want = append(want, "DELETE channels/parent/versions/first", "DELETE channels/parent/versions/second", "DELETE channels/parent")
+				want = append(
+					want,
+					"DELETE channels/parent/versions/first",
+					"DELETE channels/parent/versions/second",
+					"DELETE channels/parent",
+				)
 			}
 			if !reflect.DeepEqual(calls, want) {
 				t.Fatalf("requests=%v, want=%v", calls, want)

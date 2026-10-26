@@ -4,19 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/util"
+	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/pointer"
 
 	"log/slog"
 )
 
 // CreateNodePool creates a new nodepool for the specified cluster.
-func (c *HyperFleetClient) CreateNodePool(ctx context.Context, clusterID string, req ResourceCreateRequest) (*Resource, error) {
+func (c *HyperFleetClient) CreateNodePool(
+	ctx context.Context,
+	clusterID string,
+	req ResourceCreateRequest,
+) (*Resource, error) {
 	slog.Info("creating nodepool", "cluster_id", clusterID, "name", req.Name)
 	np, err := c.CreateResource(ctx, ClustersPath+"/"+clusterID+"/"+NodepoolsPath, req)
 	if err != nil {
 		return nil, fmt.Errorf("create nodepool %q in cluster %s: %w", req.Name, clusterID, err)
 	}
-	slog.Info("nodepool created", "cluster_id", clusterID, "nodepool_id", util.FromPtr(np.Id), "name", req.Name)
+	slog.Info("nodepool created", "cluster_id", clusterID, "nodepool_id", pointer.FromPtr(np.ID), "name", req.Name)
 	return np, nil
 }
 
@@ -31,7 +35,11 @@ func (c *HyperFleetClient) ListNodePools(ctx context.Context, clusterID string) 
 }
 
 // PatchNodePool updates a nodepool via PATCH.
-func (c *HyperFleetClient) PatchNodePool(ctx context.Context, clusterID, nodepoolID string, req ResourcePatchRequest) (*Resource, error) {
+func (c *HyperFleetClient) PatchNodePool(
+	ctx context.Context,
+	clusterID, nodepoolID string,
+	req ResourcePatchRequest,
+) (*Resource, error) {
 	slog.Info("patching nodepool", "cluster_id", clusterID, "nodepool_id", nodepoolID)
 	np, err := c.PatchResource(ctx, ClustersPath+"/"+clusterID+"/"+NodepoolsPath+"/"+nodepoolID, req)
 	if err != nil {
@@ -42,7 +50,10 @@ func (c *HyperFleetClient) PatchNodePool(ctx context.Context, clusterID, nodepoo
 }
 
 // PatchNodePoolFromPayload patches a nodepool from a JSON payload file.
-func (c *HyperFleetClient) PatchNodePoolFromPayload(ctx context.Context, clusterID, nodepoolID, payloadPath string) (*Resource, error) {
+func (c *HyperFleetClient) PatchNodePoolFromPayload(
+	ctx context.Context,
+	clusterID, nodepoolID, payloadPath string,
+) (*Resource, error) {
 	return c.PatchResourceFromPayload(ctx, ClustersPath+"/"+clusterID+"/"+NodepoolsPath+"/"+nodepoolID, payloadPath)
 }
 
@@ -58,12 +69,18 @@ func (c *HyperFleetClient) DeleteNodePool(ctx context.Context, clusterID, nodepo
 }
 
 // CreateNodePoolFromPayload creates a nodepool from a JSON payload file.
-func (c *HyperFleetClient) CreateNodePoolFromPayload(ctx context.Context, clusterID, payloadPath string) (*Resource, error) {
+func (c *HyperFleetClient) CreateNodePoolFromPayload(
+	ctx context.Context,
+	clusterID, payloadPath string,
+) (*Resource, error) {
 	return c.CreateResourceFromPayload(ctx, ClustersPath+"/"+clusterID+"/"+NodepoolsPath, payloadPath)
 }
 
 // GetNodePoolStatuses retrieves all adapter statuses for a nodepool.
-func (c *HyperFleetClient) GetNodePoolStatuses(ctx context.Context, clusterID, nodepoolID string) (*AdapterStatusList, error) {
+func (c *HyperFleetClient) GetNodePoolStatuses(
+	ctx context.Context,
+	clusterID, nodepoolID string,
+) (*AdapterStatusList, error) {
 	return c.GetResourceStatuses(ctx, ClustersPath+"/"+clusterID+"/"+NodepoolsPath+"/"+nodepoolID)
 }
 
