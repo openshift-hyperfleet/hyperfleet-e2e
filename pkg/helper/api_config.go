@@ -39,6 +39,9 @@ type apiValues struct {
 type apiEntity struct {
 	Rest             map[string]any `yaml:",inline"`
 	Kind             string         `yaml:"kind"`
+	Plural           string         `yaml:"plural"`
+	ParentKind       string         `yaml:"parent_kind,omitempty"`
+	OnParentDelete   string         `yaml:"on_parent_delete,omitempty"`
 	RequiredAdapters []string       `yaml:"required_adapters"`
 }
 
@@ -136,31 +139,12 @@ func (h *Helper) waitForAPIReady(ctx context.Context, entity descriptor.EntityDe
 // entity with the given kind to set required_adapters, and returns the
 // marshaled result.
 func getAndPatchHelmValues(ctx context.Context, namespace, kind string, adapters []string) ([]byte, error) {
-	getCmd := exec.CommandContext(ctx, "helm", "get", "values", helmReleaseName, // #nosec G204
-		"--all",
-		"--namespace", namespace,
-		"--output", "yaml",
-	)
-	// Use Output() (stdout only). CombinedOutput() would merge stderr
-	// warnings (kubeconfig permissions, deprecation notices) into the
-	// YAML and corrupt the parse.
-	stdout, err := getCmd.Output()
+	vals, err := getAPIHelmValues(ctx, namespace)
 	if err != nil {
-		// On error, capture stderr from the ExitError if available.
-		stderr := ""
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			stderr = string(exitErr.Stderr)
-		}
-		return nil, fmt.Errorf("failed to get helm values: %w (stderr: %s)", err, stderr)
+		return nil, err
 	}
 
-	var vals apiValues
-	if unmarshalErr := yaml.Unmarshal(stdout, &vals); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to parse helm values: %w", unmarshalErr)
-	}
-
-	if patchErr := patchEntityRequiredAdapters(&vals, kind, adapters); patchErr != nil {
+	if patchErr := patchEntityRequiredAdapters(vals, kind, adapters); patchErr != nil {
 		return nil, patchErr
 	}
 
@@ -170,6 +154,35 @@ func getAndPatchHelmValues(ctx context.Context, namespace, kind string, adapters
 	}
 
 	return patchedBytes, nil
+}
+
+// getAPIHelmValues reads every value of the deployed API release. The read is
+// stdout-only: CombinedOutput() would merge stderr warnings (kubeconfig
+// permissions, deprecation notices) into the YAML and corrupt the parse.
+func getAPIHelmValues(ctx context.Context, namespace string) (*apiValues, error) {
+	getCmd := exec.CommandContext(ctx, "helm", "get", "values", helmReleaseName, // #nosec G204
+		"--all",
+		"--namespace", namespace,
+		"--output", "yaml",
+	)
+	stdout, err := getCmd.Output()
+	if err != nil {
+		// On error, capture stderr from the ExitError if available.
+		stderr := ""
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			stderr = string(exitErr.Stderr)
+		}
+		return nil, fmt.Errorf("failed to get helm values for release %q in namespace %q: %w (stderr: %s)",
+			helmReleaseName, namespace, err, stderr)
+	}
+
+	var vals apiValues
+	if unmarshalErr := yaml.Unmarshal(stdout, &vals); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse helm values for release %q in namespace %q: %w",
+			helmReleaseName, namespace, unmarshalErr)
+	}
+	return &vals, nil
 }
 
 // patchEntityRequiredAdapters finds the entity with the given kind in

@@ -135,6 +135,52 @@ func TestPatchEntityRequiredAdapters(t *testing.T) {
 	}
 }
 
+// A read-modify-write of the Helm values must not add parent fields to a root
+// entity: the API chart's schema only allows cascade or restrict for
+// on_parent_delete, so an empty string would fail the upgrade.
+func TestAPIEntityMarshalOmitsEmptyParentFields(t *testing.T) {
+	const values = `config:
+  entities:
+    - kind: Cluster
+      plural: clusters
+      required_adapters: [cl-namespace]
+    - kind: NodePool
+      plural: nodepools
+      parent_kind: Cluster
+      on_parent_delete: cascade
+      required_adapters: [np-configmap]
+`
+	var vals apiValues
+	if err := yaml.Unmarshal([]byte(values), &vals); err != nil {
+		t.Fatal(err)
+	}
+	out, err := yaml.Marshal(vals)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decoded struct {
+		Config struct {
+			Entities []map[string]any `yaml:"entities"`
+		} `yaml:"config"`
+	}
+	if err := yaml.Unmarshal(out, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Config.Entities) != 2 {
+		t.Fatalf("entities = %d, want 2:\n%s", len(decoded.Config.Entities), out)
+	}
+	for _, key := range []string{"parent_kind", "on_parent_delete"} {
+		if _, exists := decoded.Config.Entities[0][key]; exists {
+			t.Errorf("root entity gained %q on round-trip:\n%s", key, out)
+		}
+	}
+	child := decoded.Config.Entities[1]
+	if child["parent_kind"] != "Cluster" || child["on_parent_delete"] != "cascade" {
+		t.Errorf("child parent fields lost on round-trip:\n%s", out)
+	}
+}
+
 // Exercise the real get/patch/upgrade/ready/restore call chain with a local Helm
 // stand-in. No Kubernetes or Helm installation is used by these tests.
 func TestUpgradeAndRestoreDescriptorAdapters(t *testing.T) {

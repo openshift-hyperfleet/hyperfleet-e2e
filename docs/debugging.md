@@ -128,6 +128,30 @@ For validation errors (400/422), the embedded JSON may include a field-level `er
 unexpected status code 400 for create cluster: {"code":"HYPERFLEET-VAL-001",...,"errors":[{"field":"spec.name","constraint":"required","message":"Cluster name is required"}]}
 ```
 
+### Startup Entity Drift Check
+
+A live run fails before the first spec when the deployed API does not serve the
+entity configuration in `pkg/config/descriptor.go`. The error names the Helm
+release and namespace and lists one line per difference:
+
+```text
+API entity configuration drift: Helm release "hyperfleet-api" in namespace "e2e-ns" does not match the E2E descriptor table in pkg/config/descriptor.go (2 difference(s)):
+  - CascadeChild: parent_kind: deployed "Cluster", expected "Parent"
+  - Referencer: missing from config.entities
+```
+
+Compare the report with the deployed values:
+
+```bash
+helm get values hyperfleet-api --all --namespace "$NAMESPACE" --output yaml | yq '.config.entities'
+```
+
+Usually the environment was deployed from a different `hyperfleet-infra`
+revision than this test binary, or a descriptor row changed without a matching
+infra change. Redeploy `e2e-kind`/`e2e-gcp` or update the descriptor table. Do
+not relax the guard to make a stale environment pass. `--dry-run` skips this
+check because it lists specs without a cluster.
+
 ---
 
 ## 3. Log Interpretation

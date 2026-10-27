@@ -143,6 +143,14 @@ curl -f -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/
 
 ## Configure Test Settings
 
+Every live run starts with a read-only drift check: `hyperfleet-e2e` runs
+`helm get values hyperfleet-api --all --namespace "$NAMESPACE"` and compares the
+deployed `config.entities` with its descriptor table. Set `NAMESPACE` to the
+namespace that holds the API release and make sure `helm` and `KUBECONFIG` can
+read it. A mismatch fails the suite before any spec runs; see
+[debugging.md](debugging.md#startup-entity-drift-check). `make list-tests` and
+`--dry-run` skip the check.
+
 ### Override Image Settings (Optional)
 
 If your deployment uses custom image settings, update `env/env.local` in this repo to match your infrastructure deployment settings:

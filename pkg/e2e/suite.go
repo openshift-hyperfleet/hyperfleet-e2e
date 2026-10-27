@@ -36,6 +36,20 @@ var _ = ginkgo.SynchronizedBeforeSuite(
 			log.Fatalf("Suite config not initialized")
 		}
 
+		// Fail before any spec runs when the deployed API does not serve the
+		// entity configuration this suite's descriptor table expects. This runs
+		// for every live run, including AUTH_MODE=NONE, because entity routing is
+		// independent of authentication. A dry run only lists specs and never
+		// touches a cluster, so it skips the guard.
+		if !config.IsDryRun() {
+			if cfg.Entities == nil {
+				ginkgo.Fail("entity descriptor catalog is not loaded")
+			}
+			if err := helper.ValidateAPIEntityConfig(ctx, cfg.Namespace, cfg.Entities.All()); err != nil {
+				ginkgo.Fail(err.Error())
+			}
+		}
+
 		if config.IsDryRun() || cfg.AuthMode == config.AuthModeNone || !cfg.Identity.TokenRequest.IsEnabled() {
 			return nil
 		}

@@ -2,6 +2,7 @@ package descriptor
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,37 @@ func TestPathsPreserveIDConcatenation(t *testing.T) {
 	}
 	if _, err := catalog.Lookup("Unknown"); err == nil {
 		t.Fatal("unknown kind accepted")
+	}
+}
+
+func TestCatalogAllIsSortedAndOwned(t *testing.T) {
+	t.Parallel()
+	catalog, err := NewCatalog([]EntityDescriptor{
+		{Kind: "Zeta", Plural: "zetas", RequiredAdapters: []string{"z"}, Timeouts: EntityTimeouts{Reconciled: time.Second}},
+		{Kind: "Alpha", Plural: "alphas", RequiredAdapters: []string{"a"}, Timeouts: EntityTimeouts{Reconciled: time.Second}},
+		{Kind: "Beta", Plural: "betas", ParentKind: "Alpha", OnParentDelete: "cascade"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entities := catalog.All()
+	var kinds []string
+	for _, entity := range entities {
+		kinds = append(kinds, entity.Kind)
+	}
+	if want := []string{"Alpha", "Beta", "Zeta"}; !slices.Equal(kinds, want) {
+		t.Fatalf("All() kinds = %v, want %v", kinds, want)
+	}
+
+	entities[0].RequiredAdapters[0] = "changed"
+	if got := catalog.MustGet("Alpha").RequiredAdapters[0]; got != "a" {
+		t.Fatalf("All() exposed the catalog's adapters: got %q", got)
+	}
+
+	var nilCatalog *Catalog
+	if got := nilCatalog.All(); got != nil {
+		t.Fatalf("nil catalog All() = %v, want nil", got)
 	}
 }
 
