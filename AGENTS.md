@@ -24,7 +24,7 @@ Run `make check` before you call work done, then `make build`.
 - `make install-hooks`: installs the pre-commit hooks (`.pre-commit-config.yaml`: secret scanning, commitlint, Go tooling, file hygiene)
 - `make lint`: verifies `.golangci.yml` against the v2 schema, then runs golangci-lint pinned in `tools/go.mod`
 - `make test`: unit tests for `./pkg/...` and `./cmd/...`, with race detection and coverage. E2E specs need a live environment; see `docs/setup.md`
-- `make list-tests`: dry run that lists specs by tier. Use it to check labels and names without a cluster
+- `make list-tests`: dry run that lists specs by tier. Use it to check labels and names without a cluster; dry runs skip the startup entity drift check
 
 ## Where to look
 
@@ -87,6 +87,8 @@ if expected := h.ExpectedIdentity(); expected != "" {
 ```
 
 ## Gotchas
+
+- Every live run starts with a read-only drift check: `helm get values hyperfleet-api --all -n "$NAMESPACE"` must match the descriptor table, or the suite fails in `SynchronizedBeforeSuite` before any spec runs. Set `NAMESPACE` to the namespace that holds the API release and keep `helm`/`KUBECONFIG` able to read it. See `docs/debugging.md#startup-entity-drift-check`.
 
 - Resolve a known descriptor after `helper.New()` with `h.Entities.MustGet("Cluster")`; use `Lookup` for runtime kind names. Generic resource helpers take a descriptor and parent ID (empty for roots).
 
