@@ -114,22 +114,6 @@ func (c *Catalog) Lookup(kind string) (EntityDescriptor, error) {
 	return EntityDescriptor{}, fmt.Errorf("entity kind %q not found in descriptor catalog", kind)
 }
 
-// All returns every descriptor ordered by kind. Like Lookup, it returns copies,
-// so a caller cannot change another caller's adapters or cleanup policy.
-func (c *Catalog) All() []EntityDescriptor {
-	if c == nil {
-		return nil
-	}
-	entities := make([]EntityDescriptor, 0, len(c.entries))
-	for _, entity := range c.entries {
-		entities = append(entities, entity.clone())
-	}
-	slices.SortFunc(entities, func(a, b EntityDescriptor) int {
-		return strings.Compare(a.Kind, b.Kind)
-	})
-	return entities
-}
-
 // MustGet is for known kind literals in specs. Use Lookup for runtime input.
 func (c *Catalog) MustGet(kind string) EntityDescriptor {
 	entity, err := c.Lookup(kind)

@@ -6,9 +6,15 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/openshift-hyperfleet/hyperfleet-e2e/pkg/descriptor"
 )
+
+// helmValuesReadTimeout bounds the startup Helm read. The suite context carries
+// only the suite-level timeout, so a stalled helm exec would otherwise block
+// process 1, and every parallel process waiting on it, for the whole run.
+const helmValuesReadTimeout = 60 * time.Second
 
 // ValidateAPIEntityConfig compares the entity configuration of the deployed API
 // Helm release with the E2E descriptor table. It is a read-only startup guard:
@@ -35,7 +41,10 @@ func ValidateAPIEntityConfig(
 		)
 	}
 
-	values, err := getAPIHelmValues(ctx, namespace)
+	readCtx, cancel := context.WithTimeout(ctx, helmValuesReadTimeout)
+	defer cancel()
+
+	values, err := getAPIHelmValues(readCtx, namespace)
 	if err != nil {
 		return fmt.Errorf("API entity drift check: %w", err)
 	}
@@ -61,33 +70,7 @@ func apiEntityDiffs(expected []descriptor.EntityDescriptor, deployed []apiEntity
 		return []string{"config.entities is missing or empty in the deployed Helm values"}
 	}
 
-	structural := make([]string, 0)
-	byKind := make(map[string]apiEntity, len(deployed))
-	pluralKind := make(map[string]string, len(deployed))
-	for _, entity := range deployed {
-		kind := entity.Kind
-		if strings.TrimSpace(kind) == "" {
-			structural = append(structural, "config.entities has an entry without a kind")
-			continue
-		}
-		if _, exists := byKind[kind]; exists {
-			structural = append(structural, fmt.Sprintf("%s: duplicate kind in config.entities", kind))
-			continue
-		}
-		byKind[kind] = entity
-		plural := strings.TrimSpace(entity.Plural)
-		if plural == "" {
-			structural = append(structural, fmt.Sprintf("%s: plural is empty in config.entities", kind))
-			continue
-		}
-		if other, exists := pluralKind[plural]; exists {
-			structural = append(structural,
-				fmt.Sprintf("%s: plural %q is already used by kind %s", kind, plural, other))
-			continue
-		}
-		pluralKind[plural] = kind
-	}
-	slices.Sort(structural)
+	structural, byKind := structuralEntityDiffs(deployed)
 
 	rows := slices.Clone(expected)
 	slices.SortFunc(rows, func(a, b descriptor.EntityDescriptor) int {
@@ -118,4 +101,39 @@ func apiEntityDiffs(expected []descriptor.EntityDescriptor, deployed []apiEntity
 		}
 	}
 	return diffs
+}
+
+// structuralEntityDiffs indexes deployed entities by kind and reports the rows
+// the field comparison cannot use: entries without a kind, duplicate kinds, and
+// empty or duplicate plurals. The returned map holds the first occurrence of
+// each kind.
+func structuralEntityDiffs(deployed []apiEntity) ([]string, map[string]apiEntity) {
+	structural := make([]string, 0)
+	byKind := make(map[string]apiEntity, len(deployed))
+	pluralKind := make(map[string]string, len(deployed))
+	for _, entity := range deployed {
+		kind := entity.Kind
+		if strings.TrimSpace(kind) == "" {
+			structural = append(structural, "config.entities has an entry without a kind")
+			continue
+		}
+		if _, exists := byKind[kind]; exists {
+			structural = append(structural, fmt.Sprintf("%s: duplicate kind in config.entities", kind))
+			continue
+		}
+		byKind[kind] = entity
+		plural := strings.TrimSpace(entity.Plural)
+		if plural == "" {
+			structural = append(structural, fmt.Sprintf("%s: plural is empty in config.entities", kind))
+			continue
+		}
+		if other, exists := pluralKind[plural]; exists {
+			structural = append(structural,
+				fmt.Sprintf("%s: plural %q is already used by kind %s", kind, plural, other))
+			continue
+		}
+		pluralKind[plural] = kind
+	}
+	slices.Sort(structural)
+	return structural, byKind
 }

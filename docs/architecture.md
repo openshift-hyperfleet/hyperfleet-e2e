@@ -186,16 +186,8 @@ only a table row can fail that check. Startup logs
 `adapters_<kind>`, `timeout_<kind>_reconciled` and `timeout_<kind>_deleted` for
 each row with adapters or timeouts in the "Loaded configuration" entry.
 
-Before any spec runs, process 1 of `SynchronizedBeforeSuite` calls
-`helper.ValidateAPIEntityConfig`: it reads `config.entities` from the deployed
-`hyperfleet-api` Helm release in `NAMESPACE` and compares every row of the
-descriptor table by `kind`, `plural`, `parent_kind` and `on_parent_delete`. A
-missing row or a changed field fails the suite with a deterministic field-level
-diff instead of letting specs fail later against routes or deletion semantics
-the API does not serve. Extra deployed kinds are allowed. The check is
-read-only, runs for `AUTH_MODE=NONE` too, and is skipped only by `--dry-run`,
-which must stay cluster-free. It needs `helm` and a `KUBECONFIG` that can read
-the release namespace.
+The suite's startup drift guard is `helper.ValidateAPIEntityConfig`; see
+[pkg/e2e](#pkge2e) for when it runs.
 
 Fixture rows register routing and cleanup metadata. Parent and CascadeChild wait
 for hard-delete, so they default to the Cluster timeouts; their adapters and the
@@ -252,6 +244,17 @@ client/API without new helper validation.
 - Configures Ginkgo reporters, timeouts, and filters
 - Handles suite-level setup and teardown
 - `initLogging(cfg)` - Configures the default `slog` logger with the shared handler and Ginkgo context
+
+**Startup drift guard** (`suite.go`): before any spec runs, process 1 of
+`SynchronizedBeforeSuite` calls `helper.ValidateAPIEntityConfig`. It reads
+`config.entities` from the deployed `hyperfleet-api` Helm release in `NAMESPACE`
+and compares every row of the descriptor table by `kind`, `plural`, `parent_kind`
+and `on_parent_delete`. A missing row or a changed field fails the suite with a
+deterministic field-level diff instead of letting specs fail later against routes
+or deletion semantics the API does not serve. Extra deployed kinds are allowed.
+The check is read-only, runs for `AUTH_MODE=NONE` too, and needs `helm` plus a
+`KUBECONFIG` that can read the release namespace. Ginkgo does not execute setup
+nodes in `--dry-run`, so listing specs stays cluster-free.
 
 ## Configuration Priority
 
