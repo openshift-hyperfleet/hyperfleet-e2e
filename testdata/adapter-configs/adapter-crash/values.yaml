@@ -1,0 +1,51 @@
+adapterConfig:
+  create: true
+  files:
+    adapter-config.yaml: adapter-crash/adapter-config.yaml
+  log:
+    level: debug
+
+adapterTaskConfig:
+  create: true
+  files:
+    task-config.yaml: adapter-crash/adapter-task-config.yaml
+
+broker:
+  type: ${BROKER_TYPE}
+  # Bound to the `parents` topic on purpose: HYPERFLEET-1729 scopes the failure
+  # roles to parents. DeployAdapter requires Entity.Plural but does not export it
+  # to envsubst, so a role deployed on another plural needs its own values.yaml;
+  # this block is the only plural-specific part of the role.
+  create: true
+  googlepubsub:
+    projectId: ${GCP_PROJECT_ID}
+    # The role watches the fixture plural, one subscription per role, so several
+    # roles can observe the same kind at once.
+    subscriptionId: ${NAMESPACE}-parents-${ADAPTER_NAME}
+    topic: ${NAMESPACE}-parents
+    deadLetterTopic: ${NAMESPACE}-parents-dlq
+    createTopicIfMissing: ${ADAPTER_GOOGLEPUBSUB_CREATE_TOPIC_IF_MISSING}
+    createSubscriptionIfMissing: ${ADAPTER_GOOGLEPUBSUB_CREATE_SUBSCRIPTION_IF_MISSING}
+    expirationTTL: "1d"
+  rabbitmq:
+    url: ${RABBITMQ_URL}
+    queue: ${NAMESPACE}-parents-${ADAPTER_NAME}
+    exchange: ${NAMESPACE}-parents
+    routingKey: ${ADAPTER_NAME}
+
+image:
+  registry: ${IMAGE_REGISTRY}
+  repository: ${ADAPTER_IMAGE_REPO}
+  pullPolicy: Always
+  tag: ${ADAPTER_IMAGE_TAG}
+
+rbac:
+   resources:
+     - namespaces
+
+labels:
+  e2e.hyperfleet.io/run-id: ${RUN_ID}
+
+env:
+  - name: RUN_ID
+    value: ${RUN_ID}
