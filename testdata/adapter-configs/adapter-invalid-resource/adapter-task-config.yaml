@@ -8,6 +8,13 @@
 # way cl-invalid-resource targets the namespace cl-namespace creates. Deploy this
 # role alongside the success role so the rejection is the invalid name and not a
 # missing namespace.
+#
+# The ConfigMap deliberately has no lifecycle.delete gate. A resource without one
+# is applied again while the resource is being deleted, so this role keeps failing
+# and Finalized stays False with ExecutionFailed:resources. That is the condition
+# cl-invalid-resource produces on a Cluster, which HYPERFLEET-1729 asks this role
+# to reproduce; a delete gate would make the role report Finalized=True and drop
+# that coverage. A journey that needs the hard delete to finish undeploys it.
 
 schema_version: "2.0"
 

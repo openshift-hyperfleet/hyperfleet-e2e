@@ -12,6 +12,10 @@ adapterTaskConfig:
 
 broker:
   type: ${BROKER_TYPE}
+  # Bound to the `parents` topic on purpose: HYPERFLEET-1729 scopes the failure
+  # roles to parents. DeployAdapter requires Entity.Plural but does not export it
+  # to envsubst, so a role deployed on another plural needs its own values.yaml;
+  # this block is the only plural-specific part of the role.
   create: true
   googlepubsub:
     projectId: ${GCP_PROJECT_ID}
