@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "{{ .resourceId }}-reapply"
+  labels:
+    hyperfleet.io/cluster-id: "{{ .resourceId }}"
+    e2e.hyperfleet.io/run-id: "{{ .runId }}"
+  annotations:
+    hyperfleet.io/generation: "{{ .generation }}"

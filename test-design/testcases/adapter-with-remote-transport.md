@@ -5,6 +5,7 @@
 1. [Adapter creates a cluster's resources through the applier and reports their status](#test-title-adapter-creates-a-clusters-resources-through-the-applier-and-reports-their-status)
 2. [Cluster delete waits until the applier confirms the remote objects are gone](#test-title-cluster-delete-waits-until-the-applier-confirms-the-remote-objects-are-gone)
 3. [Adapter reports undelivered desires while the applier is unavailable](#test-title-adapter-reports-undelivered-desires-while-the-applier-is-unavailable)
+4. [Delete then reapply waits for the delete to be confirmed](#test-title-delete-then-reapply-waits-for-the-delete-to-be-confirmed)
 
 ---
 
@@ -22,6 +23,8 @@ The adapter is `cl-desire` (config key `desire.adapter`). Its task config lives 
 `cl-desire` is also one of `adapters.cluster`, so the tier suites check it like any other required adapter: cluster creation checks its conditions, and the delete specs check that it reports `Finalized=True` and that `<id>-remote` is removed. The remote-transport suite fails in `BeforeAll` when `adapters.cluster` does not list it. This document covers what only the remote path has: the objects the applier writes, a delete that waits on them, and an applier outage.
 
 The suites check only what the API and the cluster show; they do not read the desire store. To inspect the store while debugging, see [Debugging](#debugging).
+
+Test 4 does not run through `cl-desire`: it deploys its own remote adapter, `cl-desire-reapply` (config in `testdata/adapter-configs/cl-desire-reapply/`), which has the delete expression also driven by a cluster label, `e2e.hyperfleet.io/delete-configmap`. That is the only way to delete a remote object and want it back while the cluster lives: `cl-desire` deletes only on `is_deleting`, and the API never clears `deleted_time`. The adapter's conditions are binary (no `Unknown`): the reasons carry the distinction — `ResourceNotFound` (confirmed absent), `GenerationMismatch` (visible but not at the requested generation), `MirrorNotSynced` (presence unconfirmed). `Available` reports the delivered state against the want: `True` when the objects are present at the current generation, and also `True` with reason `DeletionDelivered` when a label-requested deletion is confirmed — so a label-driven delete that stays deleted converges (`Reconciled=True` with the object gone) instead of hanging unreconciled. The spec always flips the gate off before the delete confirms, so it only ever wants the object back. The spec adds the adapter to the required adapters for its duration (so the cluster stays unreconciled, and the Sentinel's cadence drives the adapter's retry after the delete confirms), and creates an additional NetworkPolicy, `redis-ingress-cl-desire-reapply`. Both changes are restored in `DeferCleanup`; the spec is `Serial` because of them.
 
 Coverage moved here from the retired transport suite:
 
@@ -312,6 +315,149 @@ kubectl get namespace ${CLUSTER_ID}-remote
 **Expected Result:**
 - `Reconciled` becomes `True` within `timeouts.cluster.reconciled`
 - The Namespace exists
+
+---
+
+## Test Title: Delete then reapply waits for the delete to be confirmed
+
+### Description
+
+This test validates the delete-then-reapply path against the real applier. A remote object is deleted through a delete expression the test controls (a cluster label, not `is_deleting`), the deletion is held open by a finalizer, and the object is wanted back before the delete is confirmed. The store must refuse the new `ApplyDesire` while the `DeleteDesire` is unconfirmed, so the object is never applied onto the terminating object: it keeps its UID and its pre-delete content, and the adapter reports `Available=False` at the new generation — a wrongly accepted reapply would instead land on the terminating object and report `Available=True`. Once the finalizer is released, the applier confirms the delete, the next event's apply replaces the `DeleteDesire`, and the object is recreated with a new UID and the new content.
+
+---
+
+| **Field** | **Value** |
+|-----------|-----------|
+| **Pos/Neg** | Positive |
+| **Priority** | Tier1 |
+| **Status** | Draft |
+| **Automation** | Automated |
+| **Version** | MVP |
+| **Created** | 2026-10-22 |
+| **Updated** | 2026-10-22 |
+
+---
+
+### Preconditions
+
+1. Environment is prepared using [hyperfleet-infra](https://github.com/openshift-hyperfleet/hyperfleet-infra) with all required platform resources
+2. A dedicated cl-desire-reapply adapter is available for deployment via Helm
+
+---
+
+### Test Steps
+
+#### Step 1: Deploy the adapter and make it required
+
+**Action:**
+- Create a network policy for the `cl-desire-reapply` admitting traffic from this adapter to the redis instance (desire store): the spec does this via `AdmitDesireStoreClient`
+- Deploy `cl-desire-reapply` via Helm, release `adapter-clusters-cl-desire-reapply`: the spec does this through `helper.DeployAdapter`.
+- Add `cl-desire-reapply` to the Cluster entity's `required_adapters` and roll the API: the spec does this through `helper.UpgradeAPIRequiredAdapters`
+
+**Expected Result:**
+- The adapter runs and reaches the desire store
+- The API's `Reconciled` aggregation now includes `cl-desire-reapply`
+- All changes are undone by the spec's cleanup even when it fails
+
+#### Step 2: Create a cluster and wait for it to be Reconciled
+
+**Action:**
+- Create a cluster and record its ID:
+```bash
+jq --arg n "hp-cluster-manual-$RANDOM" '.name = $n' testdata/payloads/clusters/cluster-request.json > cluster.json
+CLUSTER_ID=$(curl -s -X POST ${API_URL}/api/hyperfleet/v1/clusters \
+  -H "Content-Type: application/json" \
+  -d @cluster.json | jq -r '.id')
+```
+- Poll until the cluster is `Reconciled=True`:
+```bash
+curl -s ${API_URL}/api/hyperfleet/v1/clusters/${CLUSTER_ID} \
+  | jq '.status.conditions[] | select(.type == "Reconciled")'
+```
+- Check the ConfigMap and record its UID:
+```bash
+kubectl get configmap reapply-config -n ${CLUSTER_ID}-reapply -o jsonpath='{.metadata.uid}{"\n"}{.metadata.annotations}{"\n"}{.data}{"\n"}'
+```
+
+**Expected Result:**
+- The cluster reaches `Reconciled=True` within `timeouts.cluster.reconciled`
+- `cl-desire-reapply` reports `Applied`, `Available` and `Health` `True` at generation 1
+- The ConfigMap exists with generation annotation `1` and `cluster_id` set; record its UID
+
+#### Step 3: Delete the ConfigMap through the gate, held by a finalizer
+
+**Action:**
+- Hold the ConfigMap with a finalizer:
+```bash
+kubectl patch configmap reapply-config -n ${CLUSTER_ID}-reapply --type=strategic \
+  -p '{"metadata":{"finalizers":["e2e.hyperfleet.io/hold"]}}'
+```
+- Turn the delete gate on, carrying the cluster's other labels (the API replaces the label set wholesale on PATCH):
+```bash
+curl -s -X PATCH ${API_URL}/api/hyperfleet/v1/clusters/${CLUSTER_ID} \
+  -H "Content-Type: application/json" \
+  -d '{"labels":{"environment":"test","shard":"1","team":"platform","e2e.hyperfleet.io/delete-configmap":"true"}}'
+```
+- Poll until the ConfigMap has a `deletionTimestamp`:
+```bash
+kubectl get configmap reapply-config -n ${CLUSTER_ID}-reapply -o jsonpath='{.metadata.deletionTimestamp}{"\n"}'
+```
+
+**Expected Result:**
+- The label patch replaces the whole label set, so the cluster's other labels are carried in the patch
+- The patch bumps the generation to 2
+- The ConfigMap gets a `deletionTimestamp` within `timeouts.adapter.processing`: the applier issued the delete, the finalizer holds it
+- `cl-desire-reapply` reports `Applied=True` with `Available=False`, reason `GenerationMismatch`: the object is still visible in the mirror, but its generation annotation no longer advances while it is being deleted
+
+#### Step 4: Want the object back while the delete is held
+
+**Action:**
+- Turn the delete gate off again (same patch, `"false"`):
+```bash
+curl -s -X PATCH ${API_URL}/api/hyperfleet/v1/clusters/${CLUSTER_ID} \
+  -H "Content-Type: application/json" \
+  -d '{"labels":{"environment":"test","shard":"1","team":"platform","e2e.hyperfleet.io/delete-configmap":"false"}}'
+```
+- Poll the adapter status until `cl-desire-reapply` reports at generation 3 with `Available=False` — the accepted report is the proof that the adapter processed the gate-off event and the store refused the reapply:
+```bash
+curl -s ${API_URL}/api/hyperfleet/v1/clusters/${CLUSTER_ID}/statuses \
+  | jq -r '.items[] | select(.adapter=="cl-desire-reapply") | .conditions[]'
+```
+- Re-check for `timeouts.adapter.processing/2` (the stuck-state convention): the ConfigMap must keep its UID, `deletionTimestamp` and generation annotation `1`:
+```bash
+kubectl get configmap reapply-config -n ${CLUSTER_ID}-reapply -o jsonpath='{.metadata.uid}{"\n"}{.metadata.annotations}{"\n"}'
+```
+
+**Expected Result:**
+- The patch bumps the generation to 3
+- The ConfigMap keeps its UID, its `deletionTimestamp`, generation annotation `1` and its data: the store refused the new apply, nothing was applied onto the terminating object. A generation annotation of `3` with the same UID means a reapply landed on the terminating object — the regression this test exists to catch
+- `cl-desire-reapply`'s stored row reaches generation 3 with `Applied=False` and `Available=False`, both reason `MirrorNotSynced` — the executor marks the rejected resource unsynced: the reports are accepted (the status is `False`, not `Unknown`), so the row advancing is the direct proof that the adapter processed the gate-off event and the store refused the reapply — the distinction the tri-state discard rule used to hide. The row flipping to `Available=True` during the hold means a reapply landed on the terminating object
+- The cluster stays `Reconciled=False`, which also keeps the Sentinel re-triggering the adapter
+
+#### Step 5: Release the finalizer and verify the recreate
+
+**Action:**
+- Release the finalizer:
+```bash
+kubectl patch configmap reapply-config -n ${CLUSTER_ID}-reapply --type=strategic \
+  -p '{"metadata":{"$deleteFromPrimitiveList/finalizers":["e2e.hyperfleet.io/hold"]}}'
+```
+- Poll the adapter status until `cl-desire-reapply` reports `Applied`, `Available` and `Health` `True` at generation 3:
+```bash
+curl -s ${API_URL}/api/hyperfleet/v1/clusters/${CLUSTER_ID}/statuses \
+  | jq -r '.items[] | select(.adapter=="cl-desire-reapply") | .conditions[]'
+```
+- Verify the ConfigMap was recreated with a new UID and the new content:
+```bash
+kubectl get configmap reapply-config -n ${CLUSTER_ID}-reapply -o yaml
+```
+
+**Expected Result:**
+- The delete confirms once the object is gone; the next event's apply replaces the `DeleteDesire` atomically
+- `cl-desire-reapply` reports `Applied`, `Available` and `Health` `True` at generation 3 within `timeouts.cluster.reconciled` (the accepted report proves the recreate: `Available=True` requires the ConfigMap present with generation annotation `3`)
+- The ConfigMap exists again with a **new UID**, no `deletionTimestamp`, generation annotation `3`
+- The Namespace `<id>-reapply` kept its UID throughout: its delete expression stays gated on `is_deleting`, the label gate did not leak into it
+- The cluster reaches `Reconciled=True`
 
 ---
 
