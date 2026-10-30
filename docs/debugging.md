@@ -344,10 +344,6 @@ Check for orphaned resources:
 # Find orphaned namespaces
 kubectl get namespaces | grep -E '^e2e-|^test-'
 
-# Find orphaned remote namespaces (cl-desire): they carry no run-id label,
-# so the end-of-suite sweep does not find them
-kubectl get namespaces | grep -- '-remote$'
-
 # Check for leftover pods
 kubectl get pods -A | grep hyperfleet
 ```
