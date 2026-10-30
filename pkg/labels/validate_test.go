@@ -1,11 +1,15 @@
 package labels_test
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -77,6 +81,242 @@ func TestValidateLabels(t *testing.T) {
 			}
 		})
 	}
+}
+
+var capabilityTitle = regexp.MustCompile(`^\[Capability: [a-z0-9]+(-[a-z0-9]+)*\] \S`)
+
+var ginkgoContainer = regexp.MustCompile(`^[FPX]?(Describe|Context|When|DescribeTable|DescribeTableSubtree)$`)
+
+// TestCapabilitySpecTitles requires every spec in e2e/capability to be a
+// package-level ginkgo.Describe with a literal [Capability: <name>] title and labels.Capability.
+func TestCapabilitySpecTitles(t *testing.T) {
+	dir := filepath.Join(findE2EDirectory(t), "capability")
+	paths, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var problems []string
+	found := 0
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		node, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatalf("Failed to parse %s: %v", path, err)
+		}
+		fileProblems, fileFound := capabilitySpecProblems(node)
+		for _, problem := range fileProblems {
+			problems = append(problems, filepath.Base(path)+": "+problem)
+		}
+		found += fileFound
+	}
+
+	if found == 0 {
+		t.Fatalf("No package-level ginkgo.Describe found in %s - the check has nothing to check", dir)
+	}
+	if len(problems) > 0 {
+		t.Errorf("Found %d capability spec problems:\n  - %s", len(problems), strings.Join(problems, "\n  - "))
+	} else {
+		t.Logf("✓ All %d capability specs have a [Capability: <name>] title and labels.Capability", found)
+	}
+}
+
+func TestCapabilitySpecProblems(t *testing.T) {
+	const (
+		title    = `"[Capability: cascade-delete] Cascades"`
+		label    = "ginkgo.Label(labels.Tier0, labels.Capability)"
+		badTitle = "does not start with"
+		notTop   = "not a package-level"
+	)
+	describe := func(ttl, lbl, body string) string {
+		return "ginkgo.Describe(" + ttl + ", " + lbl + ", func() {" + body + "})"
+	}
+	container := func(fn string) string {
+		return "ginkgo." + fn + "(" + title + ", " + label + ", func() {})"
+	}
+
+	tests := []struct {
+		name      string
+		src       string
+		wantErr   string
+		wantFound int
+	}{
+		{name: "literal title with the capability label", src: "var _ = " + describe(title, label, ""), wantFound: 1},
+		{
+			name:    "suite title",
+			src:     "var _ = " + describe(`"[Suite: cluster][delete] Cascades"`, label, ""),
+			wantErr: badTitle, wantFound: 1,
+		},
+		{
+			name:    "capability name with upper case",
+			src:     "var _ = " + describe(`"[Capability: Cascade] Cascades"`, label, ""),
+			wantErr: badTitle, wantFound: 1,
+		},
+		{
+			name:    "no description",
+			src:     "var _ = " + describe(`"[Capability: cascade-delete]"`, label, ""),
+			wantErr: badTitle, wantFound: 1,
+		},
+		{
+			name:    "computed title",
+			src:     "var _ = " + describe("name", label, ""),
+			wantErr: "not a string literal", wantFound: 1,
+		},
+		{
+			name:    "missing capability label",
+			src:     "var _ = " + describe(title, "ginkgo.Label(labels.Tier0)", ""),
+			wantErr: "labels.Capability", wantFound: 1,
+		},
+		{name: "describe built in a helper", src: "func register() { " + describe(title, label, "") + " }", wantErr: notTop},
+		{
+			name:    "nested describe",
+			src:     "var _ = " + describe(title, label, describe(`"inner"`, label, "")),
+			wantErr: notTop, wantFound: 1,
+		},
+		{
+			name:      "nested context",
+			src:       "var _ = " + describe(title, label, `ginkgo.Context("inner", func() {})`),
+			wantFound: 1,
+		},
+		{
+			name:    "package-level table",
+			src:     "var _ = " + container("DescribeTable"),
+			wantErr: "package-level ginkgo.DescribeTable",
+		},
+		{name: "focused describe", src: "var _ = " + container("FDescribe"), wantErr: "package-level ginkgo.FDescribe"},
+		{
+			name:    "context in a helper",
+			src:     "func init() { " + container("Context") + " }",
+			wantErr: "outside a package-level",
+		},
+		{
+			name:    "dot import",
+			src:     `import . "github.com/onsi/ginkgo/v2"` + "\nvar _ = Describe(" + title + ", " + label + ", func() {})",
+			wantErr: "imported as",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node, err := parser.ParseFile(token.NewFileSet(), "spec.go", "package capability\n"+tt.src, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			problems, found := capabilitySpecProblems(node)
+			if found != tt.wantFound {
+				t.Errorf("found %d package-level Describes, want %d", found, tt.wantFound)
+			}
+			joined := strings.Join(problems, "; ")
+			if tt.wantErr == "" && len(problems) > 0 {
+				t.Errorf("unexpected problems: %s", joined)
+			}
+			if tt.wantErr != "" && !strings.Contains(joined, tt.wantErr) {
+				t.Errorf("problems = %q, want one containing %q", joined, tt.wantErr)
+			}
+		})
+	}
+}
+
+// capabilitySpecProblems also returns the number of package-level Describes in the file.
+func capabilitySpecProblems(node *ast.File) ([]string, int) {
+	var problems []string
+	for _, imp := range node.Imports {
+		if imp.Path.Value == `"github.com/onsi/ginkgo/v2"` && imp.Name != nil {
+			problems = append(problems, fmt.Sprintf("ginkgo is imported as %q; import it as ginkgo", imp.Name.Name))
+		}
+	}
+
+	topLevel := map[*ast.CallExpr]bool{}
+	packageLevel := map[*ast.CallExpr]bool{}
+	for _, decl := range node.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.VAR {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for _, value := range valueSpec.Values {
+				call, ok := value.(*ast.CallExpr)
+				if !ok {
+					continue
+				}
+				packageLevel[call] = true
+				if isGinkgoDescribe(call) {
+					topLevel[call] = true
+				} else if name := ginkgoCallName(call); ginkgoContainer.MatchString(name) {
+					problems = append(problems, fmt.Sprintf("package-level ginkgo.%s; capability specs use ginkgo.Describe", name))
+				}
+			}
+		}
+	}
+
+	// Containers nested in a package-level Describe inherit its title and labels.
+	inside := map[*ast.CallExpr]bool{}
+	for call := range topLevel {
+		ast.Inspect(call, func(n ast.Node) bool {
+			if nested, ok := n.(*ast.CallExpr); ok && nested != call {
+				inside[nested] = true
+			}
+			return true
+		})
+	}
+
+	ast.Inspect(node, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if !isGinkgoDescribe(call) {
+			if name := ginkgoCallName(call); ginkgoContainer.MatchString(name) && !inside[call] && !packageLevel[call] {
+				problems = append(problems, fmt.Sprintf("ginkgo.%s is outside a package-level ginkgo.Describe", name))
+			}
+			return true
+		}
+		if !topLevel[call] {
+			problems = append(problems, "ginkgo.Describe is not a package-level var initializer; nest with ginkgo.Context")
+			return true
+		}
+
+		if len(call.Args) == 0 {
+			problems = append(problems, "Describe has no title")
+			return true
+		}
+		lit, ok := call.Args[0].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			problems = append(problems, "Describe title is not a string literal")
+			return true
+		}
+		title, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			problems = append(problems, "Describe title does not unquote: "+err.Error())
+			return true
+		}
+		if !capabilityTitle.MatchString(title) {
+			problems = append(problems, fmt.Sprintf("title %q does not start with \"[Capability: <name>] \"", title))
+		}
+		if spec := extractSpecFromDescribe(call, ""); spec == nil || !slices.Contains(spec.Labels, labels.Capability) {
+			problems = append(problems, fmt.Sprintf("%q does not carry labels.Capability", title))
+		}
+		return true
+	})
+	return problems, len(topLevel)
+}
+
+// ginkgoCallName returns X for a call spelled ginkgo.X, or "" for any other call.
+func ginkgoCallName(call *ast.CallExpr) string {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	if ident, ok := sel.X.(*ast.Ident); !ok || ident.Name != "ginkgo" {
+		return ""
+	}
+	return sel.Sel.Name
 }
 
 // testSpec represents a Ginkgo test specification with its labels
@@ -153,18 +393,7 @@ func extractSpecsFromFile(node *ast.File, filePath string) []testSpec {
 
 // isGinkgoDescribe checks if a call expression is ginkgo.Describe
 func isGinkgoDescribe(call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return false
-	}
-
-	// Check if the selector is ginkgo.Describe
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
-	}
-
-	return ident.Name == "ginkgo" && sel.Sel.Name == "Describe"
+	return ginkgoCallName(call) == "Describe"
 }
 
 // extractSpecFromDescribe extracts test name and labels from a ginkgo.Describe call
@@ -200,17 +429,7 @@ func extractSpecFromDescribe(call *ast.CallExpr, filePath string) *testSpec {
 
 // isGinkgoLabel checks if a call expression is ginkgo.Label
 func isGinkgoLabel(call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return false
-	}
-
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
-	}
-
-	return ident.Name == "ginkgo" && sel.Sel.Name == "Label"
+	return ginkgoCallName(call) == "Label"
 }
 
 // extractLabelsFromLabelCall extracts label values from a ginkgo.Label() call
@@ -247,7 +466,8 @@ func constantToLabelValue(constName string) string {
 		"Negative":    labels.Negative,
 		"Performance": labels.Performance,
 		// Functionality
-		"Upgrade": labels.Upgrade,
+		"Upgrade":    labels.Upgrade,
+		"Capability": labels.Capability,
 		// Constraint
 		"Disruptive": labels.Disruptive,
 		"Slow":       labels.Slow,

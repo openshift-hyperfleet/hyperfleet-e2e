@@ -46,6 +46,7 @@ Run `make check` before you call work done, then `make build`.
 - IMPORTANT: spec files end in `.go`, never `_test.go`. Specs are compiled into the `hyperfleet-e2e` binary, not run by `go test`. The only `_test.go` file in `e2e/` is `e2e/e2e_suite_test.go`, the ginkgo CLI entry point for `make e2e-ci`. Put no spec code there.
 - Path: `e2e/<suite>/descriptive-name.go`. The package name matches the directory.
 - Describe name: `[Suite: <suite>][<category>] Description`, for example `[Suite: cluster][baseline] Cluster Resource Type Lifecycle`. Match the categories already used in that suite.
+- Capability specs in `e2e/capability/` use `[Capability: <name>] Description`, carry `labels.Capability`, and take each fixture kind by its role constant, for example `h.Entities.MustGet(config.KindCascadeChild)`.
 
 ### Labels (from `pkg/labels`, never string literals)
 

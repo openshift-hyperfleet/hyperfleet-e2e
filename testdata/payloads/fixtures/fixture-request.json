@@ -1,0 +1,9 @@
+{
+  "name": "fx-{{.Random}}",
+  "spec": {
+    "revision": 1
+  },
+  "labels": {
+    "environment": "test"
+  }
+}

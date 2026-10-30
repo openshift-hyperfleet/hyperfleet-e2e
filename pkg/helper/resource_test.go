@@ -107,10 +107,10 @@ func TestPollersPassMissingParentToAPI(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	})
 	e := h.Entities.MustGet("NodePool")
-	if _, err := h.Poll(t.Context(), e, "", "id")(); !isHTTPStatus(err, http.StatusNotFound) {
+	if _, err := h.Poll(t.Context(), e, "", "id")(); !IsHTTPStatus(err, http.StatusNotFound) {
 		t.Errorf("Poll did not preserve the API error: %v", err)
 	}
-	if _, err := h.PollAdapterStatuses(t.Context(), e, "", "id")(); !isHTTPStatus(err, http.StatusNotFound) {
+	if _, err := h.PollAdapterStatuses(t.Context(), e, "", "id")(); !IsHTTPStatus(err, http.StatusNotFound) {
 		t.Errorf("PollAdapterStatuses did not preserve the API error: %v", err)
 	}
 	if status, err := h.PollHTTPStatus(t.Context(), e, "", "id")(); err != nil || status != http.StatusNotFound {
@@ -128,10 +128,10 @@ func TestPollersPropagateErrors(t *testing.T) {
 		func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) },
 	)
 	e := h.Entities.MustGet("Cluster")
-	if _, err := h.Poll(t.Context(), e, "", "id")(); !isHTTPStatus(err, http.StatusUnauthorized) {
+	if _, err := h.Poll(t.Context(), e, "", "id")(); !IsHTTPStatus(err, http.StatusUnauthorized) {
 		t.Fatalf("lost HTTP error: %v", err)
 	}
-	if _, err := h.PollAdapterStatuses(t.Context(), e, "", "id")(); !isHTTPStatus(err, http.StatusUnauthorized) {
+	if _, err := h.PollAdapterStatuses(t.Context(), e, "", "id")(); !IsHTTPStatus(err, http.StatusUnauthorized) {
 		t.Fatalf("lost status HTTP error: %v", err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())

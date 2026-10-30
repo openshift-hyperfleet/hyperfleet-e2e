@@ -79,6 +79,7 @@ hyperfleet-e2e/
 ├── e2e/              - Test suites
 │   ├── adapter/      - Adapter lifecycle tests
 │   ├── auth/         - JWT authentication tests
+│   ├── capability/   - Generic capability tests on the fixture kinds
 │   ├── channel/      - Channel management tests
 │   ├── cluster/      - Cluster lifecycle tests
 │   ├── nodepool/     - NodePool management tests
@@ -88,6 +89,7 @@ hyperfleet-e2e/
 │   ├── adapter-configs/ - Adapter configuration files
 │   └── payloads/
 │       ├── clusters/ - Cluster creation payloads
+│       ├── fixtures/ - Fixture kind payloads for capability tests
 │       └── nodepools/ - NodePool creation payloads
 ├── test-design/      - Test design documentation
 │   ├── templates/    - Test case templates

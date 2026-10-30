@@ -45,7 +45,7 @@ func (h *Helper) CleanupTestResource(
 
 	childErr, err := h.cleanupChildren(ctx, entity, resourceID)
 	if err != nil {
-		if isHTTPStatus(err, http.StatusNotFound) {
+		if IsHTTPStatus(err, http.StatusNotFound) {
 			return nil // the parent disappeared before its children could be listed
 		}
 		return err
@@ -53,8 +53,8 @@ func (h *Helper) CleanupTestResource(
 
 	slog.Info("deleting resource via API", "kind", entity.Kind, "resource_id", resourceID)
 	if _, err := h.Client.DeleteResource(ctx, path); err != nil {
-		if (entity.Cleanup.IgnoreNotFound && isHTTPStatus(err, http.StatusNotFound)) ||
-			(entity.Cleanup.IgnoreConflict && isHTTPStatus(err, http.StatusConflict)) {
+		if (entity.Cleanup.IgnoreNotFound && IsHTTPStatus(err, http.StatusNotFound)) ||
+			(entity.Cleanup.IgnoreConflict && IsHTTPStatus(err, http.StatusConflict)) {
 			return childErr
 		}
 		return fmt.Errorf("delete %s %s: %w", entity.Kind, resourceID, err)
@@ -91,7 +91,7 @@ func (h *Helper) cleanupChildren(
 			}
 			childPath := child.ResourcePath(resourceID, *resource.ID)
 			_, err := h.Client.DeleteResource(ctx, childPath)
-			if err != nil && !isHTTPStatus(err, http.StatusNotFound) {
+			if err != nil && !IsHTTPStatus(err, http.StatusNotFound) {
 				slog.Error(
 					"failed to delete child during cleanup",
 					"kind",
@@ -135,7 +135,8 @@ func (h *Helper) pollHardDeletion(
 	return fmt.Errorf("%s %s not hard-deleted within %s", entity.Kind, resourceID, entity.Timeouts.Deleted)
 }
 
-func isHTTPStatus(err error, status int) bool {
+// IsHTTPStatus reports whether err is an API error with the given HTTP status.
+func IsHTTPStatus(err error, status int) bool {
 	var httpErr *client.HTTPError
 	return errors.As(err, &httpErr) && httpErr.StatusCode == status
 }

@@ -4,6 +4,7 @@ package e2e
 import (
 	_ "github.com/openshift-hyperfleet/hyperfleet-e2e/e2e/adapter"
 	_ "github.com/openshift-hyperfleet/hyperfleet-e2e/e2e/auth"
+	_ "github.com/openshift-hyperfleet/hyperfleet-e2e/e2e/capability"
 	_ "github.com/openshift-hyperfleet/hyperfleet-e2e/e2e/channel"
 	_ "github.com/openshift-hyperfleet/hyperfleet-e2e/e2e/cluster"
 	_ "github.com/openshift-hyperfleet/hyperfleet-e2e/e2e/nodepool"

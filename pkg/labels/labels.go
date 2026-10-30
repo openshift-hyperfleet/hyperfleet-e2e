@@ -24,9 +24,10 @@ const (
 
 // Functionality labels - Feature category dimension: describes test coverage target
 const (
-	Upgrade = "upgrade" // Version compatibility: smooth upgrades
-	Adapter = "adapter" // Adapter: specific adapter tests that install and uninstall the adapter chart
-	Auth    = "auth"    // Authentication: JWT auth validation
+	Upgrade    = "upgrade"    // Version compatibility: smooth upgrades
+	Adapter    = "adapter"    // Adapter: specific adapter tests that install and uninstall the adapter chart
+	Auth       = "auth"       // Authentication: JWT auth validation
+	Capability = "capability" // Capability: generic capability specs on the fixture kinds in e2e/capability
 )
 
 // Constraint labels - Execution constraint dimension: determines scheduling strategy

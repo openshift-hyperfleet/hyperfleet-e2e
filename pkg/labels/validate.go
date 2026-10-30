@@ -15,7 +15,7 @@ func ValidateLabels(testLabels []string) error {
 		case Negative, Performance:
 			// Optional, no validation needed
 		// Functionality dimension (optional)
-		case Upgrade:
+		case Upgrade, Adapter, Auth, Capability:
 			// Optional, no validation needed
 		// Constraint dimension (optional)
 		case Disruptive, Slow:
